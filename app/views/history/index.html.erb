@@ -1,0 +1,96 @@
+<% r = @report %>
+<% p = r.period.current %>
+<% lp = r.period.ly %>
+
+<section class="page-head">
+  <div>
+    <h1><%= month_name(r.month).capitalize %> <%= r.year %></h1>
+    <p class="muted">
+      <% if r.future? %>Este mes todavía no tiene días completos.
+      <% elsif r.complete? %>Mes completo, comparado con <%= month_name(r.month) %> de <%= r.year - 1 %>.
+      <% else %>Del 1 al <%= r.to.day %>, comparado con el mismo período de <%= r.year - 1 %>.<% end %>
+    </p>
+  </div>
+  <form class="datepicker" method="get" action="<%= history_path %>">
+    <%= link_to "‹", history_path(month: r.prev_month.strftime("%Y-%m")), class: "btn btn--ghost", title: "Mes anterior" %>
+    <input type="month" name="month" value="<%= r.from.strftime('%Y-%m') %>" max="<%= AppSettings.report_day.strftime('%Y-%m') %>" onchange="this.form.requestSubmit()">
+    <% if r.next_month <= AppSettings.report_day %>
+      <%= link_to "›", history_path(month: r.next_month.strftime("%Y-%m")), class: "btn btn--ghost", title: "Mes siguiente" %>
+    <% else %>
+      <span class="btn btn--ghost btn--disabled">›</span>
+    <% end %>
+  </form>
+</section>
+
+<section class="kpis kpis--6">
+  <div class="kpi">
+    <div class="kpi__label">Ventas del mes</div>
+    <div class="kpi__value"><%= money(p.total) %></div>
+    <div class="kpi__delta"><%= pct_badge(p.total, lp.total) %> <span class="muted">vs. <%= money(lp.total) %> en <%= r.year - 1 %></span></div>
+  </div>
+  <div class="kpi">
+    <div class="kpi__label">Venta neta (sin IVA)</div>
+    <div class="kpi__value"><%= money(p.net) %></div>
+    <div class="kpi__delta"><%= pct_badge(p.net, lp.net) %> <span class="muted">vs. <%= money(lp.net) %></span></div>
+  </div>
+  <div class="kpi">
+    <div class="kpi__label">Tickets</div>
+    <div class="kpi__value"><%= int(p.tickets) %></div>
+    <div class="kpi__delta"><%= pct_badge(p.tickets, lp.tickets) %> <span class="muted">vs. <%= int(lp.tickets) %></span></div>
+  </div>
+  <div class="kpi">
+    <div class="kpi__label">Ticket promedio</div>
+    <div class="kpi__value"><%= money(p.avg_ticket) %></div>
+    <div class="kpi__delta"><%= pct_badge(p.avg_ticket, lp.avg_ticket) %> <span class="muted">vs. <%= money(lp.avg_ticket) %></span></div>
+  </div>
+  <div class="kpi">
+    <div class="kpi__label">Ticket por persona</div>
+    <div class="kpi__value"><%= money(p.avg_per_person) %></div>
+    <div class="kpi__delta"><%= pct_badge(p.avg_per_person, lp.avg_per_person) %> <span class="muted"><%= int(p.people) %> comensales</span></div>
+  </div>
+  <div class="kpi">
+    <div class="kpi__label">Venta promedio por día</div>
+    <div class="kpi__value"><%= money(p.days.positive? ? p.total / p.days : nil) %></div>
+    <div class="kpi__delta"><span class="muted"><%= p.days %> días con venta de <%= r.rows.size %></span></div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Día a día</h2>
+  <p class="muted"><%= compare_note %> Haz clic en un día para verlo en el dashboard.</p>
+  <% if r.empty? %>
+    <p class="muted">Sin datos.</p>
+  <% else %>
+    <table class="table table--rows">
+      <thead><tr><th>Día</th><th>Venta bruta</th><th>Venta neta</th><th>Tickets</th><th>Ticket prom.</th><th>Comensales</th><th>Ticket/persona</th><th>Año anterior</th><th>Variación</th></tr></thead>
+      <tbody>
+        <% r.rows.each do |row| %>
+          <tr class="<%= 'is-closed' if row.day && !row.day.open? %>">
+            <td><%= link_to short_date(row.date), root_path(date: row.date) %></td>
+            <td><%= money(row.day&.total) %></td>
+            <td><%= money(row.day&.net) %></td>
+            <td><%= int(row.day&.tickets) %></td>
+            <td><%= money(row.day&.avg_ticket) %></td>
+            <td><%= int(row.day&.people) %></td>
+            <td><%= money(row.day&.avg_per_person) %></td>
+            <td class="muted"><%= money(row.ly_day&.total) %> <span class="small">(<%= short_date(row.ly_date) %>)</span></td>
+            <td><%= pct_badge(row.day&.total, row.ly_day&.total) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+      <tfoot>
+        <tr>
+          <td>Total</td>
+          <td><%= money(p.total) %></td>
+          <td><%= money(p.net) %></td>
+          <td><%= int(p.tickets) %></td>
+          <td><%= money(p.avg_ticket) %></td>
+          <td><%= int(p.people) %></td>
+          <td><%= money(p.avg_per_person) %></td>
+          <td class="muted"><%= money(lp.total) %></td>
+          <td><%= pct_badge(p.total, lp.total) %></td>
+        </tr>
+      </tfoot>
+    </table>
+  <% end %>
+</section>

@@ -1,0 +1,8 @@
+# Tareas programadas de Solid Queue (solo se ejecutan si corre el worker de jobs:
+# bin/jobs, o Puma con SOLID_QUEUE_IN_PUMA=true). Ver README.
+production:
+  daily_report:
+    class: DailyReportJob
+    queue: default
+    # Todos los días a las 00:00 en la zona horaria del local.
+    schedule: "0 0 * * * <%= ENV.fetch('TZ_NAME', 'America/Santiago') %>"

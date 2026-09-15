@@ -1,0 +1,19 @@
+# Secretos: nunca al repositorio
+/.env
+/.env.*
+!/.env.example
+/config/master.key
+/config/credentials/*.key
+/.kamal/secrets*
+
+# Datos y archivos generados
+/log/*
+!/log/.keep
+/tmp/*
+!/tmp/.keep
+/storage/*
+!/storage/.keep
+/db/*.sqlite3*
+/public/assets
+/out/
+.byebug_history

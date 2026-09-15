@@ -1,0 +1,15 @@
+# Nada de esto entra en la imagen de Docker
+/.git/
+/.kamal/
+/.env*
+!/.env.example
+/config/master.key
+/config/credentials/*.key
+/log/*
+/tmp/*
+/storage/*
+/db/*.sqlite3*
+/public/assets
+/node_modules/
+/test/
+/out/

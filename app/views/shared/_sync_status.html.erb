@@ -1,0 +1,13 @@
+<%# Estado de la última sincronización con Fudo. Si está en curso, la página se recarga sola cada 5 s. %>
+<% s = last_sync %>
+<% if s.nil? %>
+  <span class="pill pill--muted" title="Pulsa Sincronizar para descargar las ventas">Sin datos</span>
+<% elsif s.running? %>
+  <span class="pill pill--busy" data-controller="autorefresh" data-autorefresh-seconds-value="5">Sincronizando…</span>
+<% elsif s.error? %>
+  <span class="pill pill--error" title="<%= s.message %>">Error al sincronizar</span>
+<% else %>
+  <span class="pill pill--ok" title="<%= s.message %>">
+    Actualizado <%= ago_in_words(s.finished_at) %>
+  </span>
+<% end %>

@@ -1,0 +1,255 @@
+<% m  = @metrics %>
+<% d  = m.day %>
+<% ly = m.ly_day %>
+
+<section class="page-head">
+  <div>
+    <h1>Ventas del <%= long_date(m.report_date) %></h1>
+    <p class="muted">Comparado con el <%= long_date(m.ly_date) %>. <%= compare_note %></p>
+  </div>
+  <form class="datepicker" method="get" action="<%= root_path %>">
+    <%= link_to "‹", root_path(date: m.report_date - 1), class: "btn btn--ghost", title: "Día anterior" %>
+    <input type="date" name="date" value="<%= m.report_date %>" max="<%= AppSettings.report_day %>" onchange="this.form.requestSubmit()">
+    <% if m.report_date < AppSettings.report_day %>
+      <%= link_to "›", root_path(date: m.report_date + 1), class: "btn btn--ghost", title: "Día siguiente" %>
+    <% else %>
+      <span class="btn btn--ghost btn--disabled">›</span>
+    <% end %>
+    <%= link_to "Ayer", root_path, class: "btn btn--ghost" %>
+  </form>
+</section>
+
+<% if d.nil? %>
+  <div class="flash flash--warn">
+    No hay datos sincronizados para este día. Pulsa <strong>Sincronizar</strong> arriba a la derecha para descargar las ventas de Fudo.
+  </div>
+<% end %>
+
+<section class="kpis kpis--6">
+  <div class="kpi">
+    <div class="kpi__label">Venta bruta</div>
+    <div class="kpi__value"><%= money(d&.total) %></div>
+    <div class="kpi__delta"><%= pct_badge(d&.total, ly&.total) %> <span class="muted">vs. año anterior</span></div>
+  </div>
+  <div class="kpi">
+    <div class="kpi__label">Venta neta (sin IVA)</div>
+    <div class="kpi__value"><%= money(d&.net) %></div>
+    <div class="kpi__delta"><%= pct_badge(d&.net, ly&.net) %> <span class="muted">vs. año anterior</span></div>
+  </div>
+  <div class="kpi">
+    <div class="kpi__label">Tickets</div>
+    <div class="kpi__value"><%= int(d&.tickets) %></div>
+    <div class="kpi__delta"><%= pct_badge(d&.tickets, ly&.tickets) %> <span class="muted">vs. año anterior</span></div>
+  </div>
+  <div class="kpi">
+    <div class="kpi__label">Ticket promedio</div>
+    <div class="kpi__value"><%= money(d&.avg_ticket) %></div>
+    <div class="kpi__delta"><%= pct_badge(d&.avg_ticket, ly&.avg_ticket) %> <span class="muted">vs. año anterior</span></div>
+  </div>
+  <div class="kpi">
+    <div class="kpi__label">Ticket por persona</div>
+    <div class="kpi__value"><%= money(d&.avg_per_person) %></div>
+    <div class="kpi__delta"><%= pct_badge(d&.avg_per_person, ly&.avg_per_person) %> <span class="muted"><%= int(d&.people) %> comensales</span></div>
+  </div>
+  <% mtd = m.periods[1] %>
+  <div class="kpi">
+    <div class="kpi__label">Mes en curso</div>
+    <div class="kpi__value"><%= money(mtd.current.total) %></div>
+    <div class="kpi__delta"><%= pct_badge(mtd.current.total, mtd.ly.total) %> <span class="muted">vs. mismo período <%= m.report_date.year - 1 %></span></div>
+  </div>
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <h2>Comparación con el año anterior</h2>
+    <p class="muted"><%= long_date(m.ly_date) %></p>
+    <table class="table">
+      <thead><tr><th></th><th>Hoy</th><th>Año anterior</th><th>Variación</th></tr></thead>
+      <tbody>
+        <tr><td>Venta bruta</td><td><%= money(d&.total) %></td><td><%= money(ly&.total) %></td><td><%= pct_badge(d&.total, ly&.total) %></td></tr>
+        <tr><td>Venta neta (sin IVA)</td><td><%= money(d&.net) %></td><td><%= money(ly&.net) %></td><td><%= pct_badge(d&.net, ly&.net) %></td></tr>
+        <tr><td>Tickets</td><td><%= int(d&.tickets) %></td><td><%= int(ly&.tickets) %></td><td><%= pct_badge(d&.tickets, ly&.tickets) %></td></tr>
+        <tr><td>Ticket promedio</td><td><%= money(d&.avg_ticket) %></td><td><%= money(ly&.avg_ticket) %></td><td><%= pct_badge(d&.avg_ticket, ly&.avg_ticket) %></td></tr>
+        <tr><td>Comensales (salón)</td><td><%= int(d&.people) %></td><td><%= int(ly&.people) %></td><td><%= pct_badge(d&.people, ly&.people) %></td></tr>
+        <tr><td>Ticket por persona</td><td><%= money(d&.avg_per_person) %></td><td><%= money(ly&.avg_per_person) %></td><td><%= pct_badge(d&.avg_per_person, ly&.avg_per_person) %></td></tr>
+        <tr><td>Propinas</td><td><%= money(d&.tips) %></td><td><%= money(ly&.tips) %></td><td><%= pct_badge(d&.tips, ly&.tips) %></td></tr>
+      </tbody>
+    </table>
+    <p class="muted small">Venta neta = bruta ÷ <%= 1 + AppSettings.vat_rate %>. Ticket por persona = venta de salón con comensales registrados ÷ comensales. Las propinas no están incluidas en la venta.</p>
+  </section>
+
+  <section class="card">
+    <h2>Acumulados</h2>
+    <p class="muted">Semana, mes y año en curso hasta el día informado, contra el mismo período del año anterior.</p>
+    <table class="table">
+      <thead><tr><th></th><th>Venta bruta</th><th>Año anterior</th><th>Variación</th><th>Venta neta</th><th>Tickets</th><th>Ticket/persona</th></tr></thead>
+      <tbody>
+        <% m.periods.each do |p| %>
+          <tr>
+            <td><%= p.label %><br><span class="muted small"><%= p.from.strftime("%d/%m") %> → <%= p.to.strftime("%d/%m") %></span></td>
+            <td><%= money(p.current.total) %></td>
+            <td><%= money(p.ly.total) %></td>
+            <td><%= pct_badge(p.current.total, p.ly.total) %></td>
+            <td><%= money(p.current.net) %></td>
+            <td><%= int(p.current.tickets) %> <span class="muted small">(<%= pct_text(p.current.tickets, p.ly.tickets) %>)</span></td>
+            <td><%= money(p.current.avg_per_person) %> <span class="muted small">(<%= pct_text(p.current.avg_per_person, p.ly.avg_per_person) %>)</span></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<section class="card">
+  <div class="card__head">
+    <h2>Comparativa de todos los años</h2>
+    <span class="muted small">Histórico desde <%= m.years.last.year %></span>
+  </div>
+  <p class="muted">Cada año completo y su variación respecto al año anterior. El año en curso llega hasta el <%= m.report_date.strftime("%d/%m") %>.</p>
+  <table class="table table--rows">
+    <thead><tr><th>Año</th><th>Venta bruta</th><th>vs. año ant.</th><th>Venta neta</th><th>Tickets</th><th>Ticket prom.</th><th>Comensales</th><th>Ticket/persona</th><th>vs. año ant.</th><th>Propinas</th><th>Días</th></tr></thead>
+    <tbody>
+      <% m.years.each_with_index do |y, i| %>
+        <% prev = m.years[i + 1]&.full %>
+        <tr class="<%= 'is-current' unless y.complete %>">
+          <td><%= y.year %><% unless y.complete %> <span class="muted small">(en curso)</span><% end %></td>
+          <td><%= money(y.full.total) %></td>
+          <td><%= y.complete ? pct_badge(y.full.total, prev&.total) : pct_badge(nil, nil) %></td>
+          <td><%= money(y.full.net) %></td>
+          <td><%= int(y.full.tickets) %></td>
+          <td><%= money(y.full.avg_ticket) %></td>
+          <td><%= int(y.full.people) %></td>
+          <td><%= money(y.full.avg_per_person) %></td>
+          <td><%= pct_badge(y.full.avg_per_person, prev&.avg_per_person) %></td>
+          <td><%= money(y.full.tips) %></td>
+          <td><%= int(y.full.days) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <h2>Mismo período de cada año</h2>
+    <p class="muted">Del 1 de enero al <%= m.report_date.strftime("%d/%m") %> de cada año: compara años incompletos de forma justa.</p>
+    <table class="table table--rows">
+      <thead><tr><th>Año</th><th>Venta bruta</th><th>vs. año ant.</th><th>Tickets</th><th>Ticket prom.</th><th>Ticket/persona</th><th>vs. año ant.</th></tr></thead>
+      <tbody>
+        <% m.years.each_with_index do |y, i| %>
+          <% prev = m.years[i + 1]&.ytd %>
+          <tr class="<%= 'is-current' unless y.complete %>">
+            <td><%= y.year %></td>
+            <td><%= money(y.ytd.total) %></td>
+            <td><%= pct_badge(y.ytd.total, prev&.total) %></td>
+            <td><%= int(y.ytd.tickets) %></td>
+            <td><%= money(y.ytd.avg_ticket) %></td>
+            <td><%= money(y.ytd.avg_per_person) %></td>
+            <td><%= pct_badge(y.ytd.avg_per_person, prev&.avg_per_person) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </section>
+  <section class="card">
+    <h2>Ventas por mes, todos los años</h2>
+    <p class="muted">Una línea por año. Pulsa en la leyenda para ocultar o mostrar un año.</p>
+    <div class="chart chart--tall"><canvas data-controller="chart" data-chart-config-value="<%= m.charts[:years].to_json %>"></canvas></div>
+  </section>
+</div>
+
+<div class="grid-2">
+  <section class="card">
+    <h2>Venta promedio diaria</h2>
+    <p class="muted">Solo se cuentan los días con al menos una venta cerrada.</p>
+    <table class="table">
+      <thead><tr><th></th><th>Venta promedio</th><th>Ticket promedio</th><th>Ticket/persona</th><th>Días</th><th>Hoy vs. promedio</th></tr></thead>
+      <tbody>
+        <% [["Año #{m.report_date.year} (1 ene → hoy)", m.ytd], ["Año #{m.report_date.year - 1}, mismo período", m.ly_same_period], ["Año #{m.report_date.year - 1} completo", m.ly_full]].each do |label, avg| %>
+          <tr><td><%= label %></td><td><%= money(avg.avg_total) %></td><td><%= money(avg.avg_ticket) %></td><td><%= money(avg.avg_per_person) %></td><td><%= int(avg.days) %></td><td><%= pct_badge(d&.total, avg.avg_total) %></td></tr>
+        <% end %>
+      </tbody>
+    </table>
+  </section>
+
+  <% wd = plural_weekday(m.report_date) %>
+  <section class="card">
+    <h2>Mismo día de la semana — <%= wd %></h2>
+    <p class="muted">Cómo se compara este <%= weekday_name(m.report_date).downcase %> con el promedio de los <%= wd %>.</p>
+    <table class="table">
+      <thead><tr><th></th><th>Venta promedio</th><th>Ticket promedio</th><th>Ticket/persona</th><th>Nº <%= wd %></th><th>Hoy vs. promedio</th></tr></thead>
+      <tbody>
+        <% [["#{wd.capitalize} de #{m.report_date.year} (sin contar hoy)", m.weekday_ytd], ["#{wd.capitalize} de #{m.report_date.year - 1}", m.weekday_ly]].each do |label, avg| %>
+          <tr><td><%= label %></td><td><%= money(avg.avg_total) %></td><td><%= money(avg.avg_ticket) %></td><td><%= money(avg.avg_per_person) %></td><td><%= int(avg.days) %></td><td><%= pct_badge(d&.total, avg.avg_total) %></td></tr>
+        <% end %>
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<section class="card">
+  <h2>Últimos <%= Metrics::CHART_DAYS %> días</h2>
+  <p class="muted">Barras: venta bruta de cada día. Línea: el día comparable del año anterior.</p>
+  <div class="chart chart--tall"><canvas data-controller="chart" data-chart-config-value="<%= m.charts[:last_days].to_json %>"></canvas></div>
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <h2>Ventas por mes</h2>
+    <p class="muted"><%= m.report_date.year %> (hasta el día informado) vs. <%= m.report_date.year - 1 %>.</p>
+    <div class="chart"><canvas data-controller="chart" data-chart-config-value="<%= m.charts[:monthly].to_json %>"></canvas></div>
+  </section>
+  <section class="card">
+    <h2>Venta promedio por día de la semana</h2>
+    <p class="muted">Promedio de cada día de la semana, año en curso vs. año anterior.</p>
+    <div class="chart"><canvas data-controller="chart" data-chart-config-value="<%= m.charts[:weekday].to_json %>"></canvas></div>
+  </section>
+</div>
+
+<section class="card">
+  <div class="card__head">
+    <h2>Últimos <%= Metrics::RECENT_DAYS %> días</h2>
+    <%= link_to "Ver historial completo →", history_path(month: m.report_date.strftime("%Y-%m")), class: "link" %>
+  </div>
+  <table class="table table--rows">
+    <thead><tr><th>Día</th><th>Venta bruta</th><th>Venta neta</th><th>Tickets</th><th>Ticket prom.</th><th>Comensales</th><th>Ticket/persona</th><th>Año anterior</th><th>Variación</th></tr></thead>
+    <tbody>
+      <% m.recent.each do |r| %>
+        <tr class="<%= 'is-current' if r.date == m.report_date %>">
+          <td><%= link_to short_date(r.date), root_path(date: r.date) %></td>
+          <td><%= money(r.day&.total) %></td>
+          <td><%= money(r.day&.net) %></td>
+          <td><%= int(r.day&.tickets) %></td>
+          <td><%= money(r.day&.avg_ticket) %></td>
+          <td><%= int(r.day&.people) %></td>
+          <td><%= money(r.day&.avg_per_person) %></td>
+          <td class="muted"><%= money(r.ly_day&.total) %> <span class="small">(<%= short_date(r.ly_date) %>)</span></td>
+          <td><%= pct_badge(r.day&.total, r.ly_day&.total) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</section>
+
+<section class="card card--actions">
+  <div>
+    <h2>Informe diario por correo</h2>
+    <p class="muted">
+      Se envía todos los días a las 00:00 con estos mismos indicadores.
+      <% if last_delivery %>
+        Último envío: <%= last_delivery.report_date %> —
+        <% if last_delivery.sent? %><span class="pct pct--up">enviado</span> a <%= last_delivery.recipients %>
+        <% elsif last_delivery.error? %><span class="pct pct--down">error</span>: <%= last_delivery.message %>
+        <% else %>en curso<% end %>
+      <% else %>
+        Todavía no se ha enviado ninguno.
+      <% end %>
+    </p>
+  </div>
+  <div class="actions">
+    <%= link_to "Ver informe de este día", report_path(m.report_date), class: "btn btn--ghost", target: "_blank" %>
+    <%= button_to "Enviar informe ahora", reports_path, params: { date: m.report_date }, class: "btn btn--primary", form_class: "inline",
+                  disabled: !AppSettings.mail_configured?,
+                  data: { turbo_confirm: "¿Enviar el informe del #{m.report_date} a #{AppSettings.mail_to.join(', ')}?" } %>
+  </div>
+</section>

@@ -1,0 +1,29 @@
+<%# Página de inicio de sesión. Los usuarios se crean desde la consola (bin/rails "users:create[email,clave]"). %>
+<section class="login">
+  <div class="login__card">
+    <div class="login__brand">
+      <span class="brand__logo" aria-hidden="true">🍕</span>
+      <div>
+        <div class="login__name"><%= AppSettings.restaurant_name %></div>
+        <div class="muted">Dashboard de ventas</div>
+      </div>
+    </div>
+
+    <% if flash[:alert]  %><div class="flash flash--error"><%= flash[:alert] %></div><% end %>
+    <% if flash[:notice] %><div class="flash flash--ok"><%= flash[:notice] %></div><% end %>
+
+    <%= form_with url: session_path, class: "login__form" do |form| %>
+      <label class="field">
+        <span>Correo</span>
+        <%= form.email_field :email_address, required: true, autofocus: true, autocomplete: "username", value: params[:email_address] %>
+      </label>
+      <label class="field">
+        <span>Contraseña</span>
+        <%= form.password_field :password, required: true, autocomplete: "current-password", maxlength: 72 %>
+      </label>
+      <%= form.submit "Entrar", class: "btn btn--primary btn--block" %>
+    <% end %>
+
+    <p class="muted small login__foot">Acceso privado. <%= link_to "¿Olvidaste la contraseña?", new_password_path %></p>
+  </div>
+</section>

@@ -1,0 +1,69 @@
+# Despliegue con Kamal 2 (https://kamal-deploy.org) a un servidor Lightsail.
+#   bin/kamal setup     # primera vez: instala Docker en el servidor, sube la app y arranca el proxy
+#   bin/kamal deploy    # cada actualización
+#   bin/kamal app logs -f
+#   bin/kamal app exec -i "bin/rails console"
+service: fudo-dashboard
+
+# Imagen en Docker Hub: <usuario de Docker Hub>/fudo-dashboard
+image: CAMBIAR_USUARIO_DOCKERHUB/fudo-dashboard
+
+servers:
+  web:
+    - CAMBIAR_IP_ESTATICA_LIGHTSAIL
+
+# kamal-proxy: HTTPS automático con Let's Encrypt para este dominio
+proxy:
+  ssl: true
+  host: dashboardventas.enmipccorre.dev
+  healthcheck:
+    path: /up   # el proxy solo enruta tráfico cuando la app responde aquí
+
+registry:
+  username: CAMBIAR_USUARIO_DOCKERHUB
+  password:
+    - KAMAL_REGISTRY_PASSWORD
+
+# Lightsail (Ubuntu) entra con el usuario "ubuntu" y la clave .pem descargada de la consola
+ssh:
+  user: ubuntu
+  keys:
+    - ~/.ssh/lightsail.pem
+
+env:
+  # Secretos: se leen de .kamal/secrets
+  secret:
+    - RAILS_MASTER_KEY
+    - FUDO_API_KEY
+    - FUDO_API_SECRET
+    - SMTP_USER
+    - SMTP_PASSWORD
+    - MAIL_FROM
+    - MAIL_TO
+  # Configuración visible (no secreta)
+  clear:
+    SOLID_QUEUE_IN_PUMA: "true"         # el informe de las 00:00 (config/recurring.yml) corre dentro del servidor
+    WEB_CONCURRENCY: "1"                # servidor pequeño: un proceso Puma con varios hilos
+    RAILS_MAX_THREADS: "3"
+    RESTAURANT_NAME: Ciudad de Pie
+    TZ_NAME: America/Santiago
+    BUSINESS_DAY_CUTOFF_HOUR: "0"
+    COMPARE_MODE: weekday
+    CURRENCY_SYMBOL: "$"
+    DECIMALS: "0"
+    REFRESH_DAYS: "3"
+    VAT_RATE: "0.19"
+    HISTORY_FROM: "2019-01-01"
+    SMTP_HOST: smtp.gmail.com
+    SMTP_PORT: "587"
+
+# La base SQLite vive en un volumen de Docker: sobrevive a despliegues y reinicios
+volumes:
+  - "fudo_dashboard_storage:/rails/storage"
+
+# Assets con huella: evita 404 durante el cambio de versión
+asset_path: /rails/public/assets
+
+# Se construye en tu WSL (x86_64) y se sube a Docker Hub
+builder:
+  arch: amd64

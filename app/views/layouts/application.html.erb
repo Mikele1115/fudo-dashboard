@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <title><%= AppSettings.restaurant_name %> — Dashboard de ventas</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍕</text></svg>">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+    <%= stylesheet_link_tag "application", "data-turbo-track": "reload" %>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" data-turbo-track="reload"></script>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <body>
+    <header class="topbar">
+      <div class="topbar__inner">
+        <div class="brand">
+          <span class="brand__logo" aria-hidden="true">🍕</span>
+          <span class="brand__text">
+            <span class="brand__name"><%= AppSettings.restaurant_name %></span>
+            <span class="brand__sub">Dashboard de ventas</span>
+          </span>
+        </div>
+        <% if authenticated? %>
+        <nav class="nav">
+          <%= link_to "Dashboard", root_path, class: ("nav__link--active" if controller_name == "dashboard") %>
+          <%= link_to "Historial", history_path, class: ("nav__link--active" if controller_name == "history") %>
+        </nav>
+        <div class="topbar__actions">
+          <%= render "shared/sync_status" %>
+          <%= button_to "Sincronizar", sync_path, params: { date: params[:date] }.compact, class: "btn btn--light", form_class: "inline",
+                        disabled: last_sync&.running? %>
+          <span class="topbar__user"><%= Current.user.email_address %></span>
+          <%= button_to "Salir", session_path, method: :delete, class: "btn btn--ghost btn--dark", form_class: "inline" %>
+        </div>
+        <% end %>
+      </div>
+    </header>
+
+    <main class="container">
+      <% if flash[:notice] %><div class="flash flash--ok"><%= flash[:notice] %></div><% end %>
+      <% if flash[:alert]  %><div class="flash flash--error"><%= flash[:alert] %></div><% end %>
+
+      <% if authenticated? && !AppSettings.fudo_configured? %>
+        <div class="flash flash--warn">
+          <strong>Falta configurar Fudo.</strong> Completa <code><%= AppSettings.fudo_missing.join("</code> y <code>").html_safe %></code>
+          en el archivo <code>.env</code> y reinicia el servidor.
+        </div>
+      <% end %>
+      <% if authenticated? && !AppSettings.mail_configured? %>
+        <div class="flash flash--warn">
+          <strong>El envío de correo no está configurado.</strong> Faltan <code><%= AppSettings.mail_missing.join(", ") %></code> en <code>.env</code>.
+          El dashboard funciona igual; el informe diario no se enviará hasta completarlo.
+        </div>
+      <% end %>
+
+      <%= yield %>
+    </main>
+
+    <footer class="footer">
+      Fuente: Fudo (ventas con estado cerrado). <%= cutoff_note %>
+      Zona horaria: <%= AppSettings.timezone_name %>.
+    </footer>
+  </body>
+</html>

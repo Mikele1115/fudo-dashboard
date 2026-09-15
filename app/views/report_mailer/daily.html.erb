@@ -1,0 +1,99 @@
+<%# Informe diario en HTML. Todo el CSS va en línea porque los clientes de correo no cargan hojas externas. %>
+<% d  = @m.day %>
+<% ly = @m.ly_day %>
+<% th = "padding:8px 6px;border-bottom:2px solid #e5e7eb;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:.04em;text-align:right;" %>
+<% td = "padding:8px 6px;border-bottom:1px solid #f0f1f3;" %>
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"><title><%= report_subject(@m) %></title></head>
+<body style="margin:0;padding:0;background:#f4f5f7;font-family:Segoe UI,Helvetica,Arial,sans-serif;color:#1f2937;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:24px 0;">
+<tr><td align="center">
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#ffffff;border-radius:8px;overflow:hidden;">
+
+  <tr><td style="background:#1f2937;color:#ffffff;padding:20px 28px;">
+    <div style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;opacity:.75;">🍕 <%= @name %></div>
+    <div style="font-size:22px;font-weight:600;margin-top:4px;">Informe de ventas</div>
+    <div style="font-size:15px;margin-top:2px;opacity:.9;"><%= long_date(@m.report_date) %></div>
+  </td></tr>
+
+  <tr><td style="padding:24px 28px 8px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+      <% [["Venta del día", money(d&.total)], ["Tickets", int(d&.tickets)], ["Ticket promedio", money(d&.avg_ticket)]].each do |label, value| %>
+        <td width="33%" style="padding:8px;">
+          <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:14px 12px;text-align:center;">
+            <div style="font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;"><%= label %></div>
+            <div style="font-size:22px;font-weight:600;margin-top:4px;"><%= value %></div>
+          </div>
+        </td>
+      <% end %>
+    </tr></table>
+  </td></tr>
+
+  <tr><td style="padding:16px 28px 8px;">
+    <div style="font-size:15px;font-weight:600;margin-bottom:8px;">Comparación con el año anterior — <%= long_date(@m.ly_date) %></div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;">
+      <tr><th style="<%= th %>text-align:left;"></th><th style="<%= th %>">Hoy</th><th style="<%= th %>">Año anterior</th><th style="<%= th %>">Variación</th></tr>
+      <tr><td style="<%= td %>color:#374151;">Venta bruta</td><td style="<%= td %>text-align:right;"><%= money(d&.total) %></td><td style="<%= td %>text-align:right;"><%= money(ly&.total) %></td><td style="<%= td %>text-align:right;"><%= pct_inline(d&.total, ly&.total) %></td></tr>
+      <tr><td style="<%= td %>color:#374151;">Venta neta (sin IVA)</td><td style="<%= td %>text-align:right;"><%= money(d&.net) %></td><td style="<%= td %>text-align:right;"><%= money(ly&.net) %></td><td style="<%= td %>text-align:right;"><%= pct_inline(d&.net, ly&.net) %></td></tr>
+      <tr><td style="<%= td %>color:#374151;">Tickets</td><td style="<%= td %>text-align:right;"><%= int(d&.tickets) %></td><td style="<%= td %>text-align:right;"><%= int(ly&.tickets) %></td><td style="<%= td %>text-align:right;"><%= pct_inline(d&.tickets, ly&.tickets) %></td></tr>
+      <tr><td style="<%= td %>color:#374151;">Ticket promedio</td><td style="<%= td %>text-align:right;"><%= money(d&.avg_ticket) %></td><td style="<%= td %>text-align:right;"><%= money(ly&.avg_ticket) %></td><td style="<%= td %>text-align:right;"><%= pct_inline(d&.avg_ticket, ly&.avg_ticket) %></td></tr>
+      <tr><td style="<%= td %>color:#374151;">Comensales (salón)</td><td style="<%= td %>text-align:right;"><%= int(d&.people) %></td><td style="<%= td %>text-align:right;"><%= int(ly&.people) %></td><td style="<%= td %>text-align:right;"><%= pct_inline(d&.people, ly&.people) %></td></tr>
+      <tr><td style="<%= td %>color:#374151;">Ticket por persona</td><td style="<%= td %>text-align:right;"><%= money(d&.avg_per_person) %></td><td style="<%= td %>text-align:right;"><%= money(ly&.avg_per_person) %></td><td style="<%= td %>text-align:right;"><%= pct_inline(d&.avg_per_person, ly&.avg_per_person) %></td></tr>
+      <tr><td style="<%= td %>color:#374151;">Propinas</td><td style="<%= td %>text-align:right;"><%= money(d&.tips) %></td><td style="<%= td %>text-align:right;"><%= money(ly&.tips) %></td><td style="<%= td %>text-align:right;"><%= pct_inline(d&.tips, ly&.tips) %></td></tr>
+    </table>
+    <div style="font-size:12px;color:#6b7280;margin-top:6px;"><%= compare_note %></div>
+  </td></tr>
+
+  <tr><td style="padding:16px 28px 8px;">
+    <div style="font-size:15px;font-weight:600;margin-bottom:8px;">Acumulados</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;">
+      <tr><th style="<%= th %>text-align:left;"></th><th style="<%= th %>">Ventas</th><th style="<%= th %>">Año anterior</th><th style="<%= th %>">Variación</th><th style="<%= th %>">Tickets</th></tr>
+      <% @m.periods.each do |p| %>
+        <tr><td style="<%= td %>color:#374151;"><%= p.label %></td><td style="<%= td %>text-align:right;"><%= money(p.current.total) %></td><td style="<%= td %>text-align:right;"><%= money(p.ly.total) %></td><td style="<%= td %>text-align:right;"><%= pct_inline(p.current.total, p.ly.total) %></td><td style="<%= td %>text-align:right;"><%= int(p.current.tickets) %></td></tr>
+      <% end %>
+    </table>
+  </td></tr>
+
+  <tr><td style="padding:16px 28px 8px;">
+    <div style="font-size:15px;font-weight:600;margin-bottom:8px;">Comparativa de todos los años (1 ene → <%= @m.report_date.strftime("%d/%m") %>)</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;">
+      <tr><th style="<%= th %>text-align:left;">Año</th><th style="<%= th %>">Venta bruta</th><th style="<%= th %>">vs. año ant.</th><th style="<%= th %>">Tickets</th><th style="<%= th %>">Ticket/persona</th><th style="<%= th %>">Año completo</th></tr>
+      <% @m.years.each_with_index do |y, i| %><% prev = @m.years[i + 1]&.ytd %>
+        <tr><td style="<%= td %>color:#374151;"><%= y.year %></td><td style="<%= td %>text-align:right;"><%= money(y.ytd.total) %></td><td style="<%= td %>text-align:right;"><%= pct_inline(y.ytd.total, prev&.total) %></td><td style="<%= td %>text-align:right;"><%= int(y.ytd.tickets) %></td><td style="<%= td %>text-align:right;"><%= money(y.ytd.avg_per_person) %></td><td style="<%= td %>text-align:right;color:#6b7280;"><%= y.complete ? money(y.full.total) : "en curso" %></td></tr>
+      <% end %>
+    </table>
+    <div style="font-size:12px;color:#6b7280;margin-top:6px;">Mismo período de cada año, para comparar de forma justa. La última columna es el total del año completo.</div>
+  </td></tr>
+
+  <tr><td style="padding:16px 28px 8px;">
+    <div style="font-size:15px;font-weight:600;margin-bottom:8px;">Venta promedio diaria</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;">
+      <tr><th style="<%= th %>text-align:left;"></th><th style="<%= th %>">Venta promedio</th><th style="<%= th %>">Ticket promedio</th><th style="<%= th %>">Días con venta</th><th style="<%= th %>">Hoy vs. promedio</th></tr>
+      <% [["Año #{@m.report_date.year} (1 ene → hoy)", @m.ytd], ["Año #{@m.report_date.year - 1}, mismo período", @m.ly_same_period], ["Año #{@m.report_date.year - 1} completo", @m.ly_full]].each do |label, avg| %>
+        <tr><td style="<%= td %>color:#374151;"><%= label %></td><td style="<%= td %>text-align:right;"><%= money(avg.avg_total) %></td><td style="<%= td %>text-align:right;"><%= money(avg.avg_ticket) %></td><td style="<%= td %>text-align:right;"><%= int(avg.days) %></td><td style="<%= td %>text-align:right;"><%= pct_inline(d&.total, avg.avg_total) %></td></tr>
+      <% end %>
+    </table>
+    <div style="font-size:12px;color:#6b7280;margin-top:6px;">Los promedios consideran solo los días con al menos una venta cerrada.</div>
+  </td></tr>
+
+  <% wd = plural_weekday(@m.report_date) %>
+  <tr><td style="padding:16px 28px 8px;">
+    <div style="font-size:15px;font-weight:600;margin-bottom:8px;">Mismo día de la semana — <%= wd %></div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;">
+      <tr><th style="<%= th %>text-align:left;"></th><th style="<%= th %>">Venta promedio</th><th style="<%= th %>">Ticket promedio</th><th style="<%= th %>">Nº de <%= wd %></th><th style="<%= th %>">Hoy vs. promedio</th></tr>
+      <% [["#{wd.capitalize} de #{@m.report_date.year} (sin contar hoy)", @m.weekday_ytd], ["#{wd.capitalize} de #{@m.report_date.year - 1}", @m.weekday_ly]].each do |label, avg| %>
+        <tr><td style="<%= td %>color:#374151;"><%= label %></td><td style="<%= td %>text-align:right;"><%= money(avg.avg_total) %></td><td style="<%= td %>text-align:right;"><%= money(avg.avg_ticket) %></td><td style="<%= td %>text-align:right;"><%= int(avg.days) %></td><td style="<%= td %>text-align:right;"><%= pct_inline(d&.total, avg.avg_total) %></td></tr>
+      <% end %>
+    </table>
+  </td></tr>
+
+  <tr><td style="padding:16px 28px 24px;font-size:12px;color:#6b7280;border-top:1px solid #e5e7eb;">
+    Fuente: Fudo (ventas con estado cerrado). <%= cutoff_note %>
+    Generado el <%= Time.current.strftime('%d/%m/%Y %H:%M') %>.
+  </td></tr>
+
+</table>
+</td></tr></table>
+</body>
+</html>

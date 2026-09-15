@@ -1,0 +1,4 @@
+#!/bin/bash
+# Devuelve el valor de una variable del archivo .env (lo usa .kamal/secrets).
+#   bin/envget FUDO_API_KEY
+grep -E "^$1=" "$(dirname "$0")/../.env" | head -1 | cut -d= -f2-
