@@ -5,12 +5,12 @@
 #   bin/kamal app exec -i "bin/rails console"
 service: fudo-dashboard
 
-# Imagen en Docker Hub: <usuario de Docker Hub>/fudo-dashboard
-image: CAMBIAR_USUARIO_DOCKERHUB/fudo-dashboard
+# Imagen en GitHub Container Registry (igual que control_costos)
+image: mikele1115/fudo-dashboard
 
 servers:
   web:
-    - CAMBIAR_IP_ESTATICA_LIGHTSAIL
+    - 52.23.104.52   # Lightsail (Virginia); comparte servidor y kamal-proxy con control_costos
 
 # kamal-proxy: HTTPS automático con Let's Encrypt para este dominio
 proxy:
@@ -20,15 +20,10 @@ proxy:
     path: /up   # el proxy solo enruta tráfico cuando la app responde aquí
 
 registry:
-  username: CAMBIAR_USUARIO_DOCKERHUB
+  server: ghcr.io
+  username: mikele1115
   password:
     - KAMAL_REGISTRY_PASSWORD
-
-# Lightsail (Ubuntu) entra con el usuario "ubuntu" y la clave .pem descargada de la consola
-ssh:
-  user: ubuntu
-  keys:
-    - ~/.ssh/lightsail.pem
 
 env:
   # Secretos: se leen de .kamal/secrets
@@ -67,3 +62,9 @@ asset_path: /rails/public/assets
 # Se construye en tu WSL (x86_64) y se sube a Docker Hub
 builder:
   arch: amd64
+
+# Atajos: bin/kamal console / shell / logs
+aliases:
+  console: app exec --interactive --reuse "bin/rails console"
+  shell: app exec --interactive --reuse "bash"
+  logs: app logs -f
