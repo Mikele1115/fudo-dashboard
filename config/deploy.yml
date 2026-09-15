@@ -15,7 +15,7 @@ servers:
 # kamal-proxy: HTTPS automático con Let's Encrypt para este dominio
 proxy:
   ssl: true
-  host: dashboardventas.enmipccorre.dev
+  host: ciudaddepie.enmipccorre.dev
   healthcheck:
     path: /up   # el proxy solo enruta tráfico cuando la app responde aquí
 
