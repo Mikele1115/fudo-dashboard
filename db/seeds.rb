@@ -1,14 +1,16 @@
 # Datos ficticios para probar el dashboard sin conexión a Fudo:
 #   bin/rails db:seed
 # Se borran al sincronizar con Fudo (upsert por fecha) o con: bin/rails runner "DailySale.delete_all"
-if DailySale.exists?
+if !Rails.env.development?
+  puts "Los datos de demostración solo se cargan en desarrollo (RAILS_ENV=#{Rails.env})."
+elsif DailySale.exists?
   puts "daily_sales ya tiene datos; no se cargan datos de demostración."
 else
   rng  = Random.new(42)
   to   = AppSettings.report_day
   from = AppSettings.history_from
   rows = (from..to).map do |d|
-    next { date: d, total: 0, tickets: 0, synced_at: Time.current } if d.wday == 1 # cierra los lunes
+    next { date: d, total: 0, tickets: 0, people: 0, people_sales: 0, tips: 0, synced_at: Time.current } if d.wday == 1 # cierra los lunes
 
     base    = 800_000 + (d.year - from.year) * 80_000            # crece año a año
     weekday = { 5 => 1.35, 6 => 1.5, 0 => 1.2 }.fetch(d.wday, 1.0) # viernes, sábado y domingo más fuertes
