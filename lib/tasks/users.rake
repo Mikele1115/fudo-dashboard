@@ -19,8 +19,17 @@ namespace :users do
 
     # $stdin.getpass no muestra lo que escribes: la contraseña no queda en el historial
     # del shell ni en los argumentos del proceso, y puede llevar cualquier carácter.
-    password = $stdin.getpass("Contraseña (no se ve al escribir): ")
-    confirm  = $stdin.getpass("Repite la contraseña: ")
+    # getpass necesita una terminal real; si la entrada viene por tubería, se lee normal.
+    ask = ->(texto) do
+      if $stdin.tty?
+        $stdin.getpass(texto)
+      else
+        print texto
+        $stdin.gets.to_s.chomp
+      end
+    end
+    password = ask.("Contraseña (no se ve al escribir): ")
+    confirm  = ask.("Repite la contraseña: ")
     abort "Las contraseñas no coinciden" unless password == confirm
     abort "La contraseña debe tener al menos 12 caracteres" if password.length < 12
 
