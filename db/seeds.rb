@@ -14,7 +14,7 @@ else
 
     base    = 800_000 + (d.year - from.year) * 80_000            # crece año a año
     weekday = { 5 => 1.35, 6 => 1.5, 0 => 1.2 }.fetch(d.wday, 1.0) # viernes, sábado y domingo más fuertes
-    season  = 1 + 0.15 * Math.sin((d.yday / 365.0) * 2 * Math::PI) # estacionalidad
+    season  = 1 + 0.15 * Math.sin(((d.yday / 365.0) * 2 * Math::PI) + (Math::PI / 2)) # estacionalidad
     total   = (base * weekday * season * (0.85 + rng.rand * 0.3)).round
     tickets = (total / (9_500 + rng.rand * 2_000)).round
     people  = (tickets * 0.65 * 2.3).round                       # ~65% de las ventas son de salón, 2,3 personas por mesa
