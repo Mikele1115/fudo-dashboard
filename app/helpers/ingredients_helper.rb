@@ -42,6 +42,16 @@ module IngredientsHelper
     tag.span(pct_text(current, base), class: "pct #{klass}")
   end
 
+  # Igual que price_change_badge, pero con estilos en línea para el correo
+  # (los clientes de correo no cargan hojas de estilo externas).
+  def price_pct_inline(current, base)
+    v = pct_value(current, base)
+    return %(<span style="color:#9ca3af;">—</span>).html_safe if v.nil?
+
+    color = v.positive? ? "#b91c1c" : "#047857"
+    %(<span style="color:#{color};font-weight:600;">#{pct_text(current, base)}</span>).html_safe
+  end
+
   # "al alza" / "a la baja" / "estable" / "sin comparación"
   def trend_badge(row)
     case row.trend

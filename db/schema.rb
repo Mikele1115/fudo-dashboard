@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_05_015652) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_05_025404) do
   create_table "daily_sales", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.date "date", null: false
@@ -42,6 +42,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_05_015652) do
     t.index ["fudo_ingredient_id", "purchased_on"], name: "idx_on_fudo_ingredient_id_purchased_on_fe9755771d"
     t.index ["fudo_item_id"], name: "index_ingredient_purchases_on_fudo_item_id", unique: true
     t.index ["purchased_on"], name: "index_ingredient_purchases_on_purchased_on"
+  end
+
+  create_table "price_alerts", force: :cascade do |t|
+    t.datetime "acknowledged_at"
+    t.decimal "baseline_price", precision: 14, scale: 4, null: false
+    t.decimal "change_pct", precision: 8, scale: 2, null: false
+    t.datetime "created_at", null: false
+    t.integer "fudo_ingredient_id", null: false
+    t.integer "fudo_item_id", null: false
+    t.string "ingredient_name", null: false
+    t.decimal "new_price", precision: 14, scale: 4, null: false
+    t.datetime "notified_at"
+    t.decimal "overcost", precision: 14, scale: 2, null: false
+    t.string "provider_name"
+    t.date "purchased_on", null: false
+    t.decimal "quantity", precision: 14, scale: 4, null: false
+    t.string "unit_name"
+    t.datetime "updated_at", null: false
+    t.index ["fudo_ingredient_id", "purchased_on"], name: "index_price_alerts_on_fudo_ingredient_id_and_purchased_on"
+    t.index ["fudo_item_id"], name: "index_price_alerts_on_fudo_item_id", unique: true
+    t.index ["purchased_on"], name: "index_price_alerts_on_purchased_on"
   end
 
   create_table "report_deliveries", force: :cascade do |t|

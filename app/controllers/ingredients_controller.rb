@@ -3,6 +3,7 @@
 # Informe del comportamiento de los precios de compra de los insumos.
 class IngredientsController < ApplicationController
   def index
+    @alerts = PriceAlert.pending.recent.limit(10)
     @prices = IngredientPrices.new(period: params[:period])
     @sort   = params[:sort].presence || "rise"
     @query  = params[:q].to_s.strip
@@ -12,6 +13,7 @@ class IngredientsController < ApplicationController
 
   def show
     @prices = IngredientPrices.new(period: params[:period])
+    @alerts = PriceAlert.where(fudo_ingredient_id: params[:id].to_i).recent.limit(5)
     @row    = @prices.rows.find { |r| r.ingredient_id == params[:id].to_i }
     return redirect_to ingredients_path, alert: "Ese insumo no tiene compras en el período elegido." if @row.nil?
 

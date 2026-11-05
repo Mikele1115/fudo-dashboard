@@ -1,0 +1,53 @@
+<% r = @r -%>
+<%= @name %> — Compras de la semana — del <%= r.from.strftime("%d/%m") %> al <%= r.to.strftime("%d/%m/%Y") %>
+<% unless r.any? -%>
+
+No se cargó ninguna compra de insumos esta semana.
+<% else -%>
+
+Gasto: <%= money(r.spend) %> | Compras: <%= int(r.count) %> | Insumos: <%= int(r.ingredients_count) %>
+Semana pasada: <%= money(r.previous.spend) %><% if r.spend_change_pct %> (<%= pct_text(r.spend, r.previous.spend) %>)<% end %>
+Precios netos, sin IVA.
+<% if r.alerts.any? -%>
+
+ALERTAS DE PRECIO (<%= r.alerts.size %>)
+<% r.alerts.each do |a| -%>
+  <%= a.ingredient_name %>: <%= money(a.baseline_price) %> -> <%= money(a.new_price) %> (<%= pct_text(a.new_price.to_f, a.baseline_price.to_f) %>), costó <%= money(a.overcost) %> de más
+<% end -%>
+<% end -%>
+
+EN QUÉ SE FUE LA PLATA
+<% r.top_spend(12).each do |l| -%>
+  <%= l.name %>: <%= money(l.spend) %> — <%= number_with_precision(l.quantity, precision: 1) %> <%= l.unit_label %> a <%= money(l.last_price) %><% if l.change_pct %> (<%= pct_text(l.last_price, l.prev_price) %>)<% end %>
+<% end -%>
+<% if r.rising.any? -%>
+
+SUBIERON DE PRECIO
+<% r.rising(8).each do |l| -%>
+  <%= l.name %>: <%= money(l.prev_price) %> -> <%= money(l.last_price) %> (<%= pct_text(l.last_price, l.prev_price) %>)
+<% end -%>
+<% end -%>
+<% if r.falling.any? -%>
+
+BAJARON DE PRECIO
+<% r.falling.each do |l| -%>
+  <%= l.name %>: <%= money(l.prev_price) %> -> <%= money(l.last_price) %> (<%= pct_text(l.last_price, l.prev_price) %>)
+<% end -%>
+<% end -%>
+<% if r.first_time.any? -%>
+
+COMPRADOS POR PRIMERA VEZ
+<% r.first_time.first(8).each do |l| -%>
+  <%= l.name %>: <%= money(l.last_price) %> / <%= l.unit_label %> (<%= money(l.spend) %>)
+<% end -%>
+<% end -%>
+<% if r.suspicious.any? -%>
+
+A REVISAR EN FUDO (<%= r.suspicious.size %> líneas con precio fuera de rango)
+<% r.suspicious.first(10).each do |p| -%>
+  <%= p.purchased_on.strftime("%d/%m") %> <%= p.ingredient_name %>: <%= number_with_precision(p.quantity, precision: 2) %> <%= p.unit_name %> por <%= money(p.line_total) %> -> <%= money(p.unit_price) %>/<%= p.unit_name %>
+<% end -%>
+<% end -%>
+<% end -%>
+
+Fuente: Fudo (egresos con detalle de insumos).

@@ -35,6 +35,31 @@
   </section>
 <% else %>
 
+<% if @alerts.any? %>
+  <section class="card card--alert">
+    <h2>⚠ <%= @alerts.size == 1 ? "Un insumo subió de precio" : "#{@alerts.size} insumos subieron de precio" %></h2>
+    <p class="muted small">
+      Compras que salieron bastante por encima de lo que se venía pagando.
+      Solo se avisa de insumos que pesan en el gasto y cuando el sobrecosto supera <%= money(PriceAlertDetector::MIN_OVERCOST) %>.
+    </p>
+    <table class="table">
+      <tr><th>Insumo</th><th>Se pagaba</th><th>Esta compra</th><th>Variación</th><th>Costó de más</th><th>Fecha</th><th></th></tr>
+      <% @alerts.each do |a| %>
+        <tr>
+          <td><%= link_to a.ingredient_name, ingredient_path(a.fudo_ingredient_id) %>
+              <span class="muted small">/ <%= a.unit_label %></span></td>
+          <td><%= money(a.baseline_price) %></td>
+          <td><strong><%= money(a.new_price) %></strong></td>
+          <td><%= price_change_badge(a.new_price.to_f, a.baseline_price.to_f) %></td>
+          <td><strong><%= money(a.overcost) %></strong></td>
+          <td class="muted small"><%= a.purchased_on.strftime("%d/%m/%y") %></td>
+          <td><%= button_to "Vista", acknowledge_alert_path(a), class: "btn btn--ghost btn--small", form_class: "inline" %></td>
+        </tr>
+      <% end %>
+    </table>
+  </section>
+<% end %>
+
 <section class="kpis kpis--6">
   <div class="kpi">
     <div class="kpi__label">Gasto en insumos</div>

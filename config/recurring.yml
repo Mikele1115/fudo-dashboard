@@ -11,3 +11,10 @@ production:
     queue: default
     # Todos los dias a las 00:00 en la zona horaria del local.
     schedule: "0 0 * * * <%= ENV.fetch('TZ_NAME', 'America/Santiago') %>"
+
+  weekly_purchases_report:
+    # Resumen semanal de compras de insumos, los viernes a las 23:00.
+    # Cubre de lunes a viernes, con las compras de ese mismo dia ya incluidas.
+    class: WeeklyPurchasesReportJob
+    queue: default
+    schedule: "0 23 * * 5 <%= ENV.fetch('TZ_NAME', 'America/Santiago') %>"

@@ -8,8 +8,14 @@ class SyncSalesJob < ApplicationJob
   def perform(report_date = nil, with_purchases: false)
     date = report_date ? Date.parse(report_date.to_s) : AppSettings.report_day
     SalesSync.run!(date)
+    return unless with_purchases
+
     # Las compras se actualizan solo en la tarea nocturna: el botón del dashboard
     # es para las ventas del día y debe responder rápido.
-    PurchasesSync.catch_up! if with_purchases
+    PurchasesSync.catch_up!
+    # Fudo no tiene webhooks, así que los saltos de precio se detectan aquí,
+    # sobre lo que acaba de descargarse.
+    PriceAlertDetector.run!
+    AlertNotifier.call
   end
 end

@@ -5,8 +5,9 @@ Rails.application.routes.draw do
 
   get  "historial", to: "history#index", as: :history
   get  "insumos", to: "ingredients#index", as: :ingredients
-  get  "insumos/:id", to: "ingredients#show", as: :ingredient, constraints: { id: /\d+/ }
+  get  "insumos/:id", to: "ingredients#show", as: :ingredient, constraints: { id: /[0-9]+/ }
   post "insumos/actualizar", to: "ingredients#sync", as: :sync_ingredients
+  post "alertas/:id/vista", to: "price_alerts#acknowledge", as: :acknowledge_alert, constraints: { id: /[0-9]+/ }
   post "sincronizar", to: "syncs#create", as: :sync
   get  "informe/:date", to: "reports#show", as: :report, constraints: { date: /\d{4}-\d{2}-\d{2}/ }
   post "informe", to: "reports#create", as: :reports
