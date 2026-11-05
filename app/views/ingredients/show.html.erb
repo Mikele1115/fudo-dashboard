@@ -1,0 +1,92 @@
+<% r = @row %>
+
+<section class="page-head">
+  <div>
+    <h1><%= r.name %></h1>
+    <p class="muted">
+      Precio por <%= r.unit_label %>, neto sin IVA.
+      <%= r.purchases_count %> compras entre el <%= @prices.from.strftime("%d/%m/%Y") %> y el <%= @prices.to.strftime("%d/%m/%Y") %>.
+      <% if r.providers.any? %>Proveedor<%= "es" if r.providers.size > 1 %>: <%= r.providers.join(", ") %>.<% end %>
+    </p>
+  </div>
+  <%= link_to "‹ Volver a insumos", ingredients_path(period: @prices.period_key), class: "btn btn--ghost" %>
+</section>
+
+<section class="kpis kpis--6">
+  <div class="kpi">
+    <div class="kpi__label">Precio actual</div>
+    <div class="kpi__value"><%= money(r.recent_price) %></div>
+    <div class="kpi__delta muted">por <%= r.unit_label %></div>
+  </div>
+  <div class="kpi">
+    <div class="kpi__label">Al inicio del período</div>
+    <div class="kpi__value"><%= money(r.baseline_price) %></div>
+    <div class="kpi__delta"><%= price_change_badge(r.recent_price, r.baseline_price) %></div>
+  </div>
+  <div class="kpi">
+    <div class="kpi__label">Precio promedio</div>
+    <div class="kpi__value"><%= money(r.avg_price) %></div>
+    <div class="kpi__delta muted">ponderado por cantidad</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi__label">Mínimo / máximo</div>
+    <div class="kpi__value" style="font-size:18px"><%= money(r.min_price) %> / <%= money(r.max_price) %></div>
+    <div class="kpi__delta muted"><%= r.min_date.strftime("%d/%m/%y") %> y <%= r.max_date.strftime("%d/%m/%y") %></div>
+  </div>
+  <div class="kpi">
+    <div class="kpi__label">Comprado</div>
+    <div class="kpi__value"><%= number_with_precision(r.quantity, precision: 1, delimiter: ".", separator: ",") %></div>
+    <div class="kpi__delta muted"><%= r.unit_label %> en el período</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi__label">Gasto</div>
+    <div class="kpi__value"><%= money(r.spend) %></div>
+    <div class="kpi__delta">
+      <% if r.spend_impact %>
+        <span class="muted"><%= r.spend_impact.positive? ? "costó" : "ahorró" %> <%= money(r.spend_impact.abs) %> por el cambio de precio</span>
+      <% end %>
+    </div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Evolución del precio</h2>
+  <p class="muted small">
+    Todo el historial disponible, no solo el período elegido. Cada punto es una compra.
+    Incluye las compras marcadas como dudosas: si ves una caída o un pico aislado, suele ser una
+    línea mal cargada en Fudo —búscala en la tabla de abajo.
+  </p>
+  <div class="chart chart--tall">
+    <canvas data-controller="chart" data-chart-config-value="<%= price_chart_config(@history).to_json %>"></canvas>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Todas las compras</h2>
+  <table class="table table--rows">
+    <thead>
+      <tr><th>Fecha</th><th>Detalle</th><th>Proveedor</th><th>Cantidad</th><th>Total línea</th><th>Precio unitario</th><th>vs. anterior</th></tr>
+    </thead>
+    <tbody>
+      <%# @history viene en orden cronológico; se muestra al revés (lo más nuevo arriba),
+          pero "vs. anterior" compara con la compra previa en el tiempo. %>
+      <% rows = @history.to_a %>
+      <% rows.each_with_index.reverse_each do |p, i| %>
+        <% previous = i.positive? ? rows[i - 1] : nil %>
+        <% suspicious = r.suspicious.include?(p) %>
+        <tr class="<%= "is-closed" if suspicious %>">
+          <td><%= p.purchased_on.strftime("%d/%m/%Y") %></td>
+          <td>
+            <%= p.detail.presence || r.name %>
+            <% if suspicious %><span class="tag tag--warn" title="Precio muy alejado del habitual: excluida de los cálculos">dudosa</span><% end %>
+          </td>
+          <td class="muted"><%= p.provider_name.presence || "—" %></td>
+          <td><%= number_with_precision(p.quantity, precision: 2, delimiter: ".", separator: ",") %> <%= r.unit_label %></td>
+          <td><%= money(p.line_total) %></td>
+          <td><strong><%= money(p.unit_price) %></strong></td>
+          <td><%= previous ? price_change_badge(p.unit_price.to_f, previous.unit_price.to_f) : content_tag(:span, "—", class: "pct pct--na") %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</section>

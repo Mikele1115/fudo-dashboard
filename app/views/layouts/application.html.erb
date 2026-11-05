@@ -26,6 +26,7 @@
         <nav class="nav">
           <%= link_to "Dashboard", root_path, class: ("nav__link--active" if controller_name == "dashboard") %>
           <%= link_to "Historial", history_path, class: ("nav__link--active" if controller_name == "history") %>
+          <%= link_to "Insumos", ingredients_path, class: ("nav__link--active" if controller_name == "ingredients") %>
         </nav>
         <div class="topbar__actions">
           <%= render "shared/sync_status" %>

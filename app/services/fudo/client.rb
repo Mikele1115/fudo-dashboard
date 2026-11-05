@@ -69,6 +69,87 @@ module Fudo
       sales
     end
 
+    # Lineas de compra de insumos entre dos fechas (ambas inclusive).
+    #
+    # En Fudo una compra es un "egreso" (/expenses) con varias lineas (expenseItems).
+    # Cada linea puede apuntar a un insumo (ingredient), a un producto, o a nada;
+    # aqui solo interesan las que tienen insumo.
+    #
+    # Ojo con dos cosas, comprobadas contra la cuenta real:
+    #   - `price` de la linea es el TOTAL de la linea, no el precio unitario
+    #     (100 cajas por 52.000 = 520 c/u). El unitario es price / quantity.
+    #   - ese total es NETO: el `amount` del egreso es ~1,19x la suma de sus lineas (IVA).
+    #
+    # Devuelve un array de:
+    #   { item_id:, expense_id:, ingredient_id:, ingredient_name:, unit_name:,
+    #     detail:, provider_name:, date: Date, quantity: Float, line_total: Float }
+    def ingredient_purchases(from_date, to_date)
+      purchases = []
+      page = 1
+      loop do
+        body = get("/expenses",
+                   "filter[date]"        => "and(gte.#{from_date},lte.#{to_date})",
+                   "filter[canceled]"    => "neq.true",
+                   "include"             => "expenseItems.ingredient,expenseItems.ingredient.unit,provider",
+                   "fields[expense]"     => "date,amount,canceled,provider,expenseItems",
+                   "fields[expenseItem]" => "price,quantity,detail,canceled,ingredient",
+                   "fields[ingredient]"  => "name,unit",
+                   "fields[provider]"    => "name",
+                   "sort"                => "id",
+                   "page[size]"          => PAGE_SIZE,
+                   "page[number]"        => page)
+
+        # JSON:API devuelve los relacionados aparte, en "included"; se indexan por [tipo, id].
+        included = body.fetch("included", []).each_with_object({}) { |r, h| h[[r["type"], r["id"]]] = r }
+
+        rows = body.fetch("data", [])
+        rows.each do |expense|
+          attrs = expense["attributes"] || {}
+          next if attrs["canceled"] || attrs["date"].nil?
+
+          date     = Date.parse(attrs["date"])
+          prov_ref = expense.dig("relationships", "provider", "data")
+          provider = prov_ref && included[[prov_ref["type"], prov_ref["id"]]]&.dig("attributes", "name")
+
+          (expense.dig("relationships", "expenseItems", "data") || []).each do |item_ref|
+            item  = included[[item_ref["type"], item_ref["id"]]]
+            next if item.nil?
+
+            iattr = item["attributes"] || {}
+            next if iattr["canceled"]
+
+            ing_ref = item.dig("relationships", "ingredient", "data")
+            next if ing_ref.nil? # linea sin insumo (producto o gasto suelto): no es compra de insumo
+
+            ingredient = included[[ing_ref["type"], ing_ref["id"]]]
+            unit_ref   = ingredient&.dig("relationships", "unit", "data")
+            unit       = unit_ref && included[[unit_ref["type"], unit_ref["id"]]]&.dig("attributes", "name")
+
+            quantity   = iattr["quantity"].to_f
+            next unless quantity.positive? # sin cantidad no hay precio unitario que calcular
+
+            purchases << {
+              item_id:         item["id"].to_i,
+              expense_id:      expense["id"].to_i,
+              ingredient_id:   ing_ref["id"].to_i,
+              ingredient_name: ingredient&.dig("attributes", "name").presence || iattr["detail"].to_s,
+              unit_name:       unit,
+              detail:          iattr["detail"],
+              provider_name:   provider,
+              date:            date,
+              quantity:        quantity,
+              line_total:      iattr["price"].to_f
+            }
+          end
+        end
+
+        break if rows.size < PAGE_SIZE
+
+        page += 1
+      end
+      purchases
+    end
+
     # Prueba de conexión: autentica y pide 1 venta.
     def ping
       token

@@ -37,11 +37,14 @@ app/
   models/
     app_settings.rb      Lee la configuración del .env (zona horaria, modo de comparación, correo…)
     daily_sale.rb        Total y tickets de cada día de negocio (tabla daily_sales)
+    ingredient_purchase.rb  Una línea de compra de insumo (tabla ingredient_purchases)
     sync_run.rb          Registro de cada sincronización con Fudo
     report_delivery.rb   Registro de cada envío del informe
   services/
     fudo/client.rb       Cliente HTTP de la API de Fudo (token, paginación, reintentos)
     sales_sync.rb        Descarga lo que falta y guarda los totales diarios (upsert)
+    purchases_sync.rb    Descarga las compras de insumos (upsert por id de línea de Fudo)
+    ingredient_prices.rb Comportamiento de los precios: medianas, ventanas y filtro de datos dudosos
     metrics.rb           Calcula todos los indicadores de un día (una consulta, todo en memoria)
     month_report.rb      Vista mensual del historial
     report_sender.rb     Envía el informe y deja registro
@@ -49,11 +52,12 @@ app/
     sync_sales_job.rb    Sincronización en segundo plano (botón "Sincronizar")
     daily_report_job.rb  Tarea programada: sincroniza + envía el informe
   mailers/report_mailer.rb  + app/views/report_mailer/daily.{html,text}.erb
-  controllers/           dashboard, history, syncs, reports (todos delgados)
-  views/                 dashboard/show, history/index, layouts/application
-  helpers/format_helper.rb  money, porcentajes y fechas en español (web y correo)
+  controllers/           dashboard, history, ingredients, syncs, reports (todos delgados)
+  views/                 dashboard/show, history/index, ingredients/{index,show}, layouts/application
+  helpers/format_helper.rb      money, porcentajes y fechas en español (web y correo)
+  helpers/ingredients_helper.rb minigráfico SVG y variación de precios (colores invertidos)
   javascript/controllers/   chart_controller.js (Chart.js), autorefresh_controller.js
-config/recurring.yml     Programación del informe (Solid Queue, modo producción)
+config/recurring.yml     Tarea nocturna de sincronización (Solid Queue, modo producción)
 lib/tasks/report.rake    Tareas de consola (check, sync, daily, preview)
 install_task.ps1         Tarea programada de Windows (ejecuta report:daily vía WSL)
 ```
@@ -94,6 +98,65 @@ Ruby 3.4 (rbenv) y Rails 8.1 están instalados en WSL. El proyecto vive en `~/fu
    Abre http://localhost:3000 y pulsa **Sincronizar**. La primera vez descarga el histórico
    desde el 1 de enero del año anterior (unos minutos). Las siguientes solo descargan los
    últimos `REFRESH_DAYS` días.
+
+## Insumos: comportamiento de los precios de compra
+
+La pestaña **Insumos** (`/insumos`) muestra cómo se han movido los precios de compra
+de cada insumo. Los datos salen de los egresos de Fudo (`/expenses`): cada línea de un
+egreso que apunta a un insumo se guarda en `ingredient_purchases`.
+
+Dos cosas comprobadas contra la cuenta real, que conviene no olvidar:
+
+- El campo `price` de una línea es el **total de la línea**, no el precio unitario
+  (100 cajas por $52.000 son $520 cada una). El unitario es `price / quantity`.
+- Ese total es **neto**: el `amount` del egreso es ~1,19× la suma de sus líneas (IVA).
+  Todo lo que se muestra en la pestaña es neto, sin IVA.
+
+### Por qué no se compara el primer precio con el último
+
+En los datos reales hay líneas mal cargadas: cantidades en gramos donde van kilos,
+totales en cero, cantidades duplicadas. Un solo dato así arruina la comparación —con
+el método ingenuo, la menta "subía" un 120.693% y la canasta un 269%.
+
+`IngredientPrices` lo resuelve así:
+
+1. toma la **mediana** de cada insumo como ancla (los extremos no la mueven),
+2. marca como **sospechosa** toda compra que se aleje más de 4× de esa mediana y la
+   excluye de los cálculos,
+3. compara **medianas de dos ventanas de 90 días** (las primeras compras del período
+   contra las últimas), nunca dos compras sueltas.
+
+Con eso la canasta da +1,8%, que es una cifra creíble. Las compras sospechosas no se
+borran: aparecen en la sección **Compras a revisar en Fudo** al final de la página,
+con la fecha y la cantidad, para poder corregirlas en el POS.
+
+### Indicadores
+
+- **La canasta**: variación media ponderada por gasto. Un insumo de $18M pesa más que
+  uno de $5.000.
+- **Costó de más / Ahorro**: la variación de precio multiplicada por el volumen
+  comprado, en pesos. Es lo que de verdad llegó al bolsillo.
+- **Los que más encarecieron la cuenta**: ordenados por ese impacto, no por porcentaje.
+  Un insumo barato que sube 100% puede dar igual; uno caro que sube 5% puede costar
+  millones.
+- La etiqueta **pocos datos** avisa cuando la variación se calcula con menos de tres
+  compras en algún extremo.
+
+Ojo con el color: aquí un precio que **sube se pinta en rojo** (malo) y uno que baja en
+verde, al revés que en las ventas.
+
+### Sincronización
+
+El botón **Actualizar compras** descarga lo nuevo. La primera vez trae
+`PurchasesSync::DEFAULT_YEARS` años (puede tardar un par de minutos); después solo los
+últimos `REFRESH_DAYS` días. La tarea nocturna de las 00:00 también las actualiza.
+
+En consola:
+
+```bash
+bin/rails runner 'PurchasesSync.run!(from: Date.new(2024,1,1))'  # histórico
+bin/rails runner 'PurchasesSync.catch_up!'                       # incremental
+```
 
 ## Informe diario a las 00:00
 

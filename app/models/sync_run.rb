@@ -5,7 +5,9 @@ class SyncRun < ApplicationRecord
   STATUSES = %w[running ok error].freeze
   validates :status, inclusion: { in: STATUSES }
 
-  scope :recent, -> { order(id: :desc) }
+  scope :recent,    -> { order(id: :desc) }
+  scope :sales,     -> { where(kind: "sales") }
+  scope :purchases, -> { where(kind: "purchases") }
 
   def running? = status == "running"
   def ok?      = status == "ok"

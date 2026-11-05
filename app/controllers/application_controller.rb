@@ -3,7 +3,7 @@ class ApplicationController < ActionController::Base
   # Only allow modern browsers supporting webp images, web push, badges, import maps, CSS nesting, and CSS :has.
   allow_browser versions: :modern
 
-  helper_method :last_sync, :last_delivery
+  helper_method :last_sync, :last_delivery, :last_purchases_sync
 
   private
 
@@ -15,6 +15,8 @@ class ApplicationController < ActionController::Base
     AppSettings.report_day
   end
 
-  def last_sync     = @last_sync ||= SyncRun.recent.first
+  # El pill de la barra superior mira solo las ventas; las compras tienen su propio estado.
+  def last_sync     = @last_sync ||= SyncRun.sales.recent.first
+  def last_purchases_sync = @last_purchases_sync ||= SyncRun.purchases.recent.first
   def last_delivery = @last_delivery ||= ReportDelivery.recent.first
 end

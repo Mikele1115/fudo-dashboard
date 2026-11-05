@@ -1,0 +1,220 @@
+<% a = @prices %>
+
+<section class="page-head">
+  <div>
+    <h1>Insumos</h1>
+    <p class="muted">
+      Comportamiento de los precios de compra entre el <%= a.from.strftime("%d/%m/%Y") %> y el <%= a.to.strftime("%d/%m/%Y") %>.
+      Precios netos, sin IVA.
+    </p>
+  </div>
+  <%# Ojo: el botón de actualizar va FUERA del formulario del período.
+      button_to genera su propio <form>, y un formulario dentro de otro es HTML
+      inválido: el navegador ignora el interno y manda el GET del de fuera. %>
+  <div class="datepicker">
+    <form method="get" action="<%= ingredients_path %>" class="inline">
+      <%= hidden_field_tag :sort, @sort %>
+      <select name="period" onchange="this.form.requestSubmit()">
+        <% IngredientPrices::PERIODS.each do |key, label| %>
+          <option value="<%= key %>" <%= "selected" if key == a.period_key %>><%= label %></option>
+        <% end %>
+      </select>
+    </form>
+    <%= button_to "Actualizar compras", sync_ingredients_path, params: { period: a.period_key },
+                  class: "btn btn--light", form_class: "inline" %>
+  </div>
+</section>
+
+<% unless a.any? %>
+  <section class="card">
+    <h2>Todavía no hay compras descargadas</h2>
+    <p class="muted">
+      Pulsa <strong>Actualizar compras</strong> para traer desde Fudo el historial de compras de insumos.
+      La primera descarga trae <%= PurchasesSync::DEFAULT_YEARS %> años y puede tardar un par de minutos.
+    </p>
+  </section>
+<% else %>
+
+<section class="kpis kpis--6">
+  <div class="kpi">
+    <div class="kpi__label">Gasto en insumos</div>
+    <div class="kpi__value"><%= money(a.total_spend) %></div>
+    <div class="kpi__delta muted"><%= a.period_label.downcase %>, sin IVA</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi__label">La canasta</div>
+    <div class="kpi__value">
+      <% if a.basket_change_pct %>
+        <span class="<%= a.basket_change_pct.positive? ? 'txt--bad' : 'txt--good' %>"><%= pct_text(a.basket_change_pct + 100, 100) %></span>
+      <% else %>—<% end %>
+    </div>
+    <div class="kpi__delta muted">variación media, ponderada por gasto</div>
+  </div>
+  <% impact = a.spend_impact_total %>
+  <div class="kpi">
+    <div class="kpi__label"><%= impact.negative? ? "Ahorro" : "Costó de más" %></div>
+    <div class="kpi__value <%= impact.negative? ? 'txt--good' : 'txt--bad' %>"><%= money(impact.abs) %></div>
+    <div class="kpi__delta muted">por el movimiento de precios</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi__label">Insumos</div>
+    <div class="kpi__value"><%= int(a.ingredients_count) %></div>
+    <div class="kpi__delta muted"><%= int(a.purchases_count) %> compras</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi__label">Subieron</div>
+    <div class="kpi__value"><%= int(a.rising.size) %></div>
+    <div class="kpi__delta muted"><%= int(a.falling.size) %> bajaron</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi__label">A revisar</div>
+    <div class="kpi__value"><%= int(a.suspicious_count) %></div>
+    <div class="kpi__delta muted">líneas con precio dudoso</div>
+  </div>
+</section>
+
+<div class="grid-2">
+  <section class="card">
+    <h2>Los que más subieron</h2>
+    <p class="muted small">Comparando la mediana de las primeras compras del período con la de las últimas.</p>
+    <table class="table">
+      <tr><th>Insumo</th><th>Antes</th><th>Ahora</th><th>Variación</th></tr>
+      <% a.top_rising(6).each do |r| %>
+        <tr>
+          <td><%= link_to r.name, ingredient_path(r.ingredient_id, period: a.period_key) %> <%= confidence_note(r) %></td>
+          <td><%= money(r.baseline_price) %></td>
+          <td><%= money(r.recent_price) %></td>
+          <td><%= price_change_badge(r.recent_price, r.baseline_price) %></td>
+        </tr>
+      <% end %>
+      <% if a.rising.empty? %><tr><td colspan="4" class="muted">Ningún insumo subió de precio en el período.</td></tr><% end %>
+    </table>
+  </section>
+
+  <section class="card">
+    <h2>Los que más bajaron</h2>
+    <p class="muted small">Buenas noticias: o negociaste mejor, o cambiaste de proveedor.</p>
+    <table class="table">
+      <tr><th>Insumo</th><th>Antes</th><th>Ahora</th><th>Variación</th></tr>
+      <% a.top_falling(6).each do |r| %>
+        <tr>
+          <td><%= link_to r.name, ingredient_path(r.ingredient_id, period: a.period_key) %> <%= confidence_note(r) %></td>
+          <td><%= money(r.baseline_price) %></td>
+          <td><%= money(r.recent_price) %></td>
+          <td><%= price_change_badge(r.recent_price, r.baseline_price) %></td>
+        </tr>
+      <% end %>
+      <% if a.falling.empty? %><tr><td colspan="4" class="muted">Ningún insumo bajó de precio en el período.</td></tr><% end %>
+    </table>
+  </section>
+</div>
+
+<section class="card">
+  <h2>Los que más encarecieron la cuenta</h2>
+  <p class="muted small">
+    Subida de precio multiplicada por el volumen comprado. Un insumo barato que sube mucho puede dar igual;
+    uno caro que sube poco puede costar millones.
+  </p>
+  <table class="table">
+    <tr><th>Insumo</th><th>Variación</th><th>Comprado</th><th>Costó de más</th></tr>
+    <% a.costliest_rises(8).each do |r| %>
+      <tr>
+        <td><%= link_to r.name, ingredient_path(r.ingredient_id, period: a.period_key) %></td>
+        <td><%= price_change_badge(r.recent_price, r.baseline_price) %></td>
+        <td><%= number_with_precision(r.quantity, precision: 1, delimiter: ".", separator: ",") %> <%= r.unit_label %></td>
+        <td><strong><%= money(r.spend_impact) %></strong></td>
+      </tr>
+    <% end %>
+    <% if a.costliest_rises(1).empty? %><tr><td colspan="4" class="muted">Nada relevante: los precios no encarecieron la cuenta en este período.</td></tr><% end %>
+  </table>
+</section>
+
+<section class="card">
+  <div class="card--actions">
+    <div>
+      <h2>Todos los insumos</h2>
+      <p class="muted small">Haz clic en un insumo para ver todas sus compras y la evolución de su precio.</p>
+    </div>
+    <form method="get" action="<%= ingredients_path %>" class="toolbar">
+      <%= hidden_field_tag :period, a.period_key %>
+      <input type="search" name="q" value="<%= @query %>" placeholder="Buscar insumo…">
+      <select name="sort" onchange="this.form.requestSubmit()">
+        <option value="rise"   <%= "selected" if @sort == "rise" %>>Mayor subida</option>
+        <option value="drop"   <%= "selected" if @sort == "drop" %>>Mayor bajada</option>
+        <option value="impact" <%= "selected" if @sort == "impact" %>>Impacto en pesos</option>
+        <option value="spend"  <%= "selected" if @sort == "spend" %>>Mayor gasto</option>
+        <option value="recent" <%= "selected" if @sort == "recent" %>>Compra más reciente</option>
+        <option value="name"   <%= "selected" if @sort == "name" %>>Nombre</option>
+      </select>
+      <button class="btn btn--light">Filtrar</button>
+    </form>
+  </div>
+
+  <table class="table table--rows">
+    <thead>
+      <tr>
+        <th>Insumo</th>
+        <th>Evolución</th>
+        <th>Precio actual</th>
+        <th>Antes</th>
+        <th>Variación</th>
+        <th>Mín. / máx.</th>
+        <th>Compras</th>
+        <th>Gasto</th>
+        <th>Última</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @rows.each do |r| %>
+        <tr>
+          <td>
+            <%= link_to r.name, ingredient_path(r.ingredient_id, period: a.period_key) %>
+            <span class="muted small">/ <%= r.unit_label %></span>
+            <% if r.suspicious_count.positive? %>
+              <span class="tag tag--warn" title="<%= r.suspicious_count %> compra(s) con precio fuera de rango, excluidas del cálculo"><%= r.suspicious_count %> dudosa<%= "s" if r.suspicious_count > 1 %></span>
+            <% end %>
+          </td>
+          <td><%= price_sparkline(r.series) %></td>
+          <td><strong><%= money(r.recent_price) %></strong></td>
+          <td><%= money(r.baseline_price) %></td>
+          <td><%= price_change_badge(r.recent_price, r.baseline_price) %> <%= confidence_note(r) %></td>
+          <td class="muted small"><%= money(r.min_price) %> / <%= money(r.max_price) %></td>
+          <td><%= int(r.purchases_count) %></td>
+          <td><%= money(r.spend) %></td>
+          <td class="muted small"><%= r.last_date.strftime("%d/%m/%y") %></td>
+        </tr>
+      <% end %>
+      <% if @rows.empty? %>
+        <tr><td colspan="9" class="muted">No hay insumos que coincidan con la búsqueda.</td></tr>
+      <% end %>
+    </tbody>
+  </table>
+</section>
+
+<% if a.to_review.any? %>
+  <section class="card">
+    <h2>Compras a revisar en Fudo</h2>
+    <p class="muted small">
+      Estas líneas tienen un precio unitario muy alejado del habitual del insumo (más de <%= IngredientPrices::OUTLIER_FACTOR.to_i %> veces por encima o por debajo).
+      Casi siempre es la cantidad cargada en la unidad equivocada —gramos donde van kilos— o un total en cero.
+      Están <strong>excluidas</strong> de todos los cálculos de arriba; corrígelas en Fudo y vuelve a actualizar.
+    </p>
+    <table class="table">
+      <tr><th>Insumo</th><th>Precio habitual</th><th>Fecha</th><th>Cantidad</th><th>Total línea</th><th>Precio unitario</th></tr>
+      <% a.to_review.first(12).each do |r| %>
+        <% r.suspicious.first(3).each_with_index do |p, i| %>
+          <tr>
+            <td><%= i.zero? ? link_to(r.name, ingredient_path(r.ingredient_id, period: a.period_key)) : "" %></td>
+            <td class="muted"><%= i.zero? ? money(r.median_price) : "" %></td>
+            <td><%= p.purchased_on.strftime("%d/%m/%y") %></td>
+            <td><%= number_with_precision(p.quantity, precision: 2, delimiter: ".", separator: ",") %> <%= r.unit_label %></td>
+            <td><%= money(p.line_total) %></td>
+            <td class="pct pct--down"><%= money(p.unit_price) %></td>
+          </tr>
+        <% end %>
+      <% end %>
+    </table>
+  </section>
+<% end %>
+
+<% end %>
