@@ -20,10 +20,15 @@ class WeeklyPurchasesReport
 
   attr_reader :from, :to
 
-  # `on` es el día del envío; la semana es el lunes de esa semana hasta ese día.
+  # `on` es el día del envío y el informe cubre la SEMANA ANTERIOR COMPLETA,
+  # de lunes a domingo. El correo sale el lunes a mediodía: si cubriera "desde
+  # el lunes hasta hoy" llegaría con solo la mañana de ese mismo día.
+  #
+  # Enviado el lunes 9, cubre del lunes 2 al domingo 8.
   def initialize(on = AppSettings.today)
-    @to   = on
-    @from = on - ((on.wday - 1) % 7) # lunes de esa misma semana
+    lunes_de_esta_semana = on - ((on.wday - 1) % 7)
+    @from = lunes_de_esta_semana - 7
+    @to   = lunes_de_esta_semana - 1
   end
 
   def purchases = @purchases ||= IngredientPurchase.between(@from, @to).chronological.to_a
@@ -35,9 +40,9 @@ class WeeklyPurchasesReport
   def ingredients_count = purchases.map(&:fudo_ingredient_id).uniq.size
   def providers  = purchases.filter_map(&:provider_name).tally.sort_by { |_, n| -n }
 
-  # Semana anterior, para comparar.
+  # La semana de antes, para comparar.
   def previous
-    @previous ||= self.class.new(@from - 3) # un día de la semana pasada; recalcula su lunes
+    @previous ||= self.class.new(@from) # su "semana anterior" es la de antes de esta
   end
 
   def spend_change_pct

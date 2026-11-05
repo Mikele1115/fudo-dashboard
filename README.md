@@ -197,10 +197,13 @@ el historial del insumo.
 
 ### Resumen semanal de compras
 
-Los **viernes a las 23:00** sale un correo con la semana (lunes a viernes): gasto contra
-la semana anterior, en qué se fue la plata, qué subió y bajó de precio, insumos comprados
-por primera vez, las alertas de la semana y las líneas mal cargadas de esos días para
-corregirlas en caliente.
+Los **lunes a las 12:00** sale un correo con la **semana anterior completa, de lunes a
+domingo**: gasto contra la semana de antes, en qué se fue la plata, qué subió y bajó de
+precio, insumos comprados por primera vez, las alertas de esa semana y las líneas mal
+cargadas para corregirlas.
+
+Ojo con la ventana: el informe nunca incluye el día en que se envía. Si cubriera "desde
+el lunes hasta hoy", al salir el lunes a mediodía llegaría casi vacío.
 
 Igual que en el resto: el **gasto** suma todas las líneas (es la plata que salió), pero
 los **precios que se comparan** solo salen de las líneas limpias. Sin eso, un total en

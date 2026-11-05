@@ -13,8 +13,8 @@ production:
     schedule: "0 0 * * * <%= ENV.fetch('TZ_NAME', 'America/Santiago') %>"
 
   weekly_purchases_report:
-    # Resumen semanal de compras de insumos, los viernes a las 23:00.
-    # Cubre de lunes a viernes, con las compras de ese mismo dia ya incluidas.
+    # Resumen semanal de compras de insumos, los lunes a las 12:00.
+    # Cubre la semana anterior completa, de lunes a domingo.
     class: WeeklyPurchasesReportJob
     queue: default
-    schedule: "0 23 * * 5 <%= ENV.fetch('TZ_NAME', 'America/Santiago') %>"
+    schedule: "0 12 * * 1 <%= ENV.fetch('TZ_NAME', 'America/Santiago') %>"
