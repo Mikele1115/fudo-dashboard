@@ -48,12 +48,6 @@
           en el archivo <code>.env</code> y reinicia el servidor.
         </div>
       <% end %>
-      <% if authenticated? && !AppSettings.mail_configured? %>
-        <div class="flash flash--warn">
-          <strong>El envío de correo no está configurado.</strong> Faltan <code><%= AppSettings.mail_missing.join(", ") %></code> en <code>.env</code>.
-          El dashboard funciona igual; el informe diario no se enviará hasta completarlo.
-        </div>
-      <% end %>
 
       <%= yield %>
     </main>
