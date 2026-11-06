@@ -9,16 +9,31 @@ class IngredientCategoriesController < ApplicationController
     @rows       = filtered_rows
   end
 
-  # Detalle de una categoría: sus insumos, cómo se movieron sus precios y
-  # cuánto se gastó mes a mes.
+  # Detalle de una categoría de Fudo (Ingredientes Barra, Pizza…): sus insumos,
+  # cómo se movieron sus precios y cuánto se gastó mes a mes.
+  def fudo_show
+    @prices    = IngredientPrices.new(period: params[:period])
+    @title     = params[:name].to_s
+    @subtitle  = "Categoría de Fudo"
+    @group     = @prices.grouped_by_fudo_category.find { |g| g.name == @title }
+    @subgroups = @group ? @prices.subcategories_of(@title) : []
+    @back_path = ingredients_path(period: @prices.period_key)
+    @self_path = fudo_category_path(@title)
+    cargar_detalle
+    render :show
+  end
+
+  # Detalle de una subcategoría propia (Quesos, Embutidos…).
   def show
-    @category = IngredientCategory.find(params[:id])
-    @prices   = IngredientPrices.new(period: params[:period])
-    @group    = @prices.grouped_by_category.find { |g| g.key&.id == @category.id }
-    @rows     = (@group&.rows || []).sort_by { |r| -r.spend }
-    @ids      = @rows.map(&:ingredient_id)
-    @alerts   = PriceAlert.where(fudo_ingredient_id: @ids).recent.limit(10)
-    @monthly  = monthly_spend(@ids)
+    @category  = IngredientCategory.find(params[:id])
+    @prices    = IngredientPrices.new(period: params[:period])
+    @title     = @category.name
+    @subtitle  = "Subcategoría · #{@category.area}"
+    @group     = @prices.grouped_by_subcategory.find { |g| g.key&.id == @category.id }
+    @subgroups = []
+    @back_path = ingredients_path(period: @prices.period_key)
+    @self_path = ingredient_category_path(@category)
+    cargar_detalle
   end
 
   # Guarda de una vez todas las asignaciones cambiadas en la pantalla.
@@ -49,6 +64,13 @@ class IngredientCategoriesController < ApplicationController
   end
 
   private
+
+  def cargar_detalle
+    @rows    = (@group&.rows || []).sort_by { |r| -r.spend }
+    @ids     = @rows.map(&:ingredient_id)
+    @alerts  = PriceAlert.where(fudo_ingredient_id: @ids).recent.limit(10)
+    @monthly = monthly_spend(@ids)
+  end
 
   # Gasto mes a mes de un grupo de insumos, para el gráfico del detalle.
   def monthly_spend(ingredient_ids)

@@ -107,14 +107,14 @@ class WeeklyPurchasesReport
   end
 
 
-  # Gasto de la semana repartido por área del restaurante, con la semana anterior
-  # al lado. Devuelve [{ area:, spend:, previous:, share: }, ...] de mayor a menor.
+  # Gasto de la semana por categoría de Fudo (Ingredientes Pizza, Barra…), con la
+  # semana anterior al lado. Devuelve [{ area:, spend:, previous:, share: }, ...].
   def by_area
     @by_area ||= begin
-      cats    = IngredientAssignment.category_by_ingredient
-      actual  = agrupar_por_area(purchases, cats)
-      pasada  = agrupar_por_area(previous.purchases, cats)
-      total   = spend
+      cats   = Ingredient.fudo_category_by_id
+      actual = agrupar_por_area(purchases, cats)
+      pasada = agrupar_por_area(previous.purchases, cats)
+      total  = spend
 
       actual.map { |area, gasto|
         { area: area, spend: gasto, previous: pasada[area] || 0.0,
@@ -131,7 +131,7 @@ class WeeklyPurchasesReport
 
   def agrupar_por_area(lineas, cats)
     lineas.each_with_object(Hash.new(0.0)) do |p, h|
-      area = cats[p.fudo_ingredient_id]&.area || "Sin categoría"
+      area = cats[p.fudo_ingredient_id].presence || Ingredient::SIN_CATEGORIA
       h[area] += p.line_total.to_f
     end
   end

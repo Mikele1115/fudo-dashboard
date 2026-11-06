@@ -1,36 +1,35 @@
+<%# Detalle de un grupo de insumos: sirve tanto para una categoría de Fudo
+    (Ingredientes Barra) como para una subcategoría propia (Quesos). %>
 <% a = @prices %>
 <% g = @group %>
-<% suben = @rows.select { |r| r.trend == "alza" }.sort_by { |r| -r.change_pct } %>
+<% suben = @rows.select { |r| r.trend == "alza" } %>
 <% bajan = @rows.select { |r| r.trend == "baja" }.sort_by(&:change_pct) %>
 
 <section class="page-head">
   <div>
-    <h1><%= @category.name %></h1>
+    <h1><%= @title %></h1>
     <p class="muted">
-      Área: <strong><%= @category.area %></strong> ·
+      <%= @subtitle %> ·
       <%= @rows.size %> insumo<%= "s" if @rows.size != 1 %> ·
       precios netos del <%= a.from.strftime("%d/%m/%Y") %> al <%= a.to.strftime("%d/%m/%Y") %>.
     </p>
   </div>
   <div class="datepicker">
-    <form method="get" action="<%= ingredient_category_path(@category) %>" class="inline">
+    <form method="get" action="<%= @self_path %>" class="inline">
       <select name="period" onchange="this.form.requestSubmit()">
         <% IngredientPrices::PERIODS.each do |key, label| %>
           <option value="<%= key %>" <%= "selected" if key == a.period_key %>><%= label %></option>
         <% end %>
       </select>
     </form>
-    <%= link_to "‹ Volver a insumos", ingredients_path(period: a.period_key), class: "btn btn--ghost" %>
+    <%= link_to "‹ Volver a insumos", @back_path, class: "btn btn--ghost" %>
   </div>
 </section>
 
 <% if @rows.empty? %>
   <section class="card">
     <h2>Sin compras en este período</h2>
-    <p class="muted">
-      Esta categoría no tiene insumos comprados entre esas fechas.
-      Prueba con un período más largo o <%= link_to "asígnale insumos", ingredient_categories_path %>.
-    </p>
+    <p class="muted">Prueba con un período más largo.</p>
   </section>
 <% else %>
 
@@ -63,16 +62,42 @@
     <div class="kpi__delta muted">saltos de precio avisados</div>
   </div>
   <div class="kpi">
-    <div class="kpi__label">Costó de más</div>
     <% impacto = @rows.filter_map(&:spend_impact).sum %>
+    <div class="kpi__label"><%= impacto.negative? ? "Ahorro" : "Costó de más" %></div>
     <div class="kpi__value <%= impacto.negative? ? 'txt--good' : 'txt--bad' %>"><%= money(impacto.abs) %></div>
-    <div class="kpi__delta muted"><%= impacto.negative? ? "ahorrado" : "por el alza de precios" %></div>
+    <div class="kpi__delta muted">por el movimiento de precios</div>
   </div>
 </section>
 
+<% if @subgroups.any? %>
+  <section class="card">
+    <h2>Por tipo de insumo</h2>
+    <p class="muted small">
+      Fudo agrupa todo esto en una sola categoría. Este desglose es el del dashboard,
+      y es el que deja ver si lo que se mueve son los quesos o las harinas.
+    </p>
+    <table class="table">
+      <thead>
+        <tr><th>Tipo</th><th>Gasto</th><th>% de la categoría</th><th>Variación</th><th>Insumos</th></tr>
+      </thead>
+      <tbody>
+        <% @subgroups.each do |sg| %>
+          <tr>
+            <td><%= sg.key ? link_to(sg.name, ingredient_category_path(sg.key, period: a.period_key)) : sg.name %></td>
+            <td><%= money(sg.spend) %></td>
+            <td class="muted"><%= number_with_precision(g.spend.positive? ? sg.spend / g.spend * 100 : 0, precision: 1, separator: ",") %>%</td>
+            <td><%= sg.change_pct ? price_change_badge(100 + sg.change_pct, 100) : content_tag(:span, "—", class: "pct pct--na") %></td>
+            <td class="muted"><%= int(sg.ingredients_count) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </section>
+<% end %>
+
 <% if suben.any? %>
   <section class="card card--alert">
-    <h2>⚠ Subidas de precio en <%= @category.name.downcase %></h2>
+    <h2>⚠ Subidas de precio</h2>
     <p class="muted small">
       Comparando la mediana de las primeras compras del período con la de las últimas.
       Ordenado por cuánto costó de más, que es lo que de verdad pesa.
@@ -90,7 +115,17 @@
             <td><strong><%= money(r.recent_price) %></strong></td>
             <td><%= price_change_badge(r.recent_price, r.baseline_price) %></td>
             <td class="muted"><%= number_with_precision(r.quantity, precision: 1, delimiter: ".", separator: ",") %> <%= r.unit_label %></td>
-            <td><strong><%= money(r.spend_impact) %></strong></td>
+            <td>
+              <%# El impacto puede salir negativo aunque el precio haya subido: pasa
+                  cuando el grueso de lo comprado se pagó por debajo del precio
+                  inicial y la subida es reciente. Poner un número negativo bajo
+                  "costó de más" confunde, así que se marca aparte. %>
+              <% if r.spend_impact && r.spend_impact.negative? %>
+                <span class="muted" title="El precio subió al final del período, pero el promedio pagado quedó por debajo del inicial: todavía no ha costado dinero">aún no</span>
+              <% else %>
+                <strong><%= money(r.spend_impact) %></strong>
+              <% end %>
+            </td>
           </tr>
         <% end %>
       </tbody>
@@ -118,15 +153,15 @@
 
 <section class="card">
   <h2>Gasto mes a mes</h2>
-  <p class="muted small">Cuánto se compró de esta categoría cada mes, en pesos netos.</p>
+  <p class="muted small">Cuánto se compró de este grupo cada mes, en pesos netos.</p>
   <div class="chart">
-    <canvas data-controller="chart" data-chart-config-value="<%= { type: 'bar', labels: @monthly[:labels], datasets: [{ label: @category.name, data: @monthly[:data] }] }.to_json %>"></canvas>
+    <canvas data-controller="chart" data-chart-config-value="<%= { type: 'bar', labels: @monthly[:labels], datasets: [{ label: @title, data: @monthly[:data] }] }.to_json %>"></canvas>
   </div>
 </section>
 
 <% if @alerts.any? %>
   <section class="card">
-    <h2>Alertas de precio de esta categoría</h2>
+    <h2>Alertas de precio</h2>
     <table class="table">
       <tr><th>Insumo</th><th>Se pagaba</th><th>Esa compra</th><th>Variación</th><th>Costó de más</th><th>Fecha</th></tr>
       <% @alerts.each do |al| %>
@@ -144,44 +179,11 @@
 <% end %>
 
 <section class="card">
-  <h2>Todos los insumos de <%= @category.name.downcase %></h2>
-  <table class="table table--rows">
-    <thead>
-      <tr>
-        <th>Insumo</th><th>Evolución</th><th>Precio actual</th><th>Antes</th>
-        <th>Variación</th><th>Mín. / máx.</th><th>Compras</th><th>Gasto</th><th>Última</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% @rows.each do |r| %>
-        <tr>
-          <td>
-            <%= link_to r.name, ingredient_path(r.ingredient_id, period: a.period_key) %>
-            <span class="muted small">/ <%= r.unit_label %></span>
-            <% if r.suspicious_count.positive? %>
-              <span class="tag tag--warn"><%= r.suspicious_count %> dudosa<%= "s" if r.suspicious_count > 1 %></span>
-            <% end %>
-          </td>
-          <td><%= price_sparkline(r.series) %></td>
-          <td><strong><%= money(r.recent_price) %></strong></td>
-          <td><%= money(r.baseline_price) %></td>
-          <td><%= price_change_badge(r.recent_price, r.baseline_price) %></td>
-          <td class="muted small"><%= money(r.min_price) %> / <%= money(r.max_price) %></td>
-          <td><%= int(r.purchases_count) %></td>
-          <td><%= money(r.spend) %></td>
-          <td class="muted small"><%= r.last_date.strftime("%d/%m/%y") %></td>
-        </tr>
-      <% end %>
-    </tbody>
-    <tfoot>
-      <tr>
-        <td>Total</td><td></td><td></td><td></td><td></td><td></td>
-        <td><%= int(@rows.sum(&:purchases_count)) %></td>
-        <td><%= money(g.spend) %></td>
-        <td></td>
-      </tr>
-    </tfoot>
-  </table>
+  <h2>Todos los insumos</h2>
+  <%= render "ingredients/mini_table", rows: @rows, period: a.period_key %>
+  <p class="small muted" style="text-align:right">
+    Total: <strong><%= money(g.spend) %></strong> en <%= int(@rows.sum(&:purchases_count)) %> compras
+  </p>
 </section>
 
 <% end %>

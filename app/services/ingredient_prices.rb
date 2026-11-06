@@ -135,39 +135,59 @@ class IngredientPrices
   end
 
 
-  # ---------- desglose por categoría y por área ----------
+  # ---------- desglose en dos niveles ----------
+  #
+  # Nivel 1: la categoría de Fudo (Ingredientes Pizza, Barra, Barriles…). Es la
+  #   que el usuario mantiene en el POS, así que manda y no se edita aquí.
+  # Nivel 2: la subcategoría fina (Quesos, Embutidos, Verduras…), que Fudo no
+  #   tiene. "Ingredientes Pizza" es el 75% del gasto: sin este detalle no se
+  #   distingue si subió el queso o la harina.
+  #
+  # El nivel 2 NO es una jerarquía fija: una subcategoría puede aparecer dentro
+  # de dos categorías de Fudo si sus insumos están repartidos. Se agrupa por
+  # insumo, no por un árbol predefinido.
 
-  # Resumen de un grupo de insumos (una categoría o un área completa).
-  Group = Struct.new(:key, :area, :name, :rows, :spend, :share, :change_pct, keyword_init: true) do
+  Group = Struct.new(:key, :name, :rows, :spend, :share, :change_pct, keyword_init: true) do
     def ingredients_count = rows.size
     def sin_categoria?    = key.nil?
   end
 
-  # { fudo_ingredient_id => IngredientCategory }
+  # { fudo_ingredient_id => IngredientCategory } (la subcategoría fina)
   def assignments = @assignments ||= IngredientAssignment.category_by_ingredient
 
-  def grouped_by_category
-    @grouped_by_category ||= build_groups { |r| assignments[r.ingredient_id] }
-      .sort_by { |g| [-g.spend] }
+  # { fudo_ingredient_id => nombre de su categoría en Fudo }
+  def fudo_categories = @fudo_categories ||= Ingredient.fudo_category_by_id
+
+  def fudo_category_for(row)
+    fudo_categories[row.ingredient_id].presence || Ingredient::SIN_CATEGORIA
   end
 
-  def grouped_by_area
-    @grouped_by_area ||= build_groups { |r| assignments[r.ingredient_id]&.area }
-      .sort_by { |g| -g.spend }
+  # Nivel 1: las categorías de Fudo, de mayor a menor gasto.
+  def grouped_by_fudo_category
+    @grouped_by_fudo_category ||= build_groups { |r| fudo_category_for(r) }.sort_by { |g| -g.spend }
   end
 
-  # Categorías de un área, para el detalle.
-  def categories_of(area)
-    grouped_by_category.select { |g| g.area == area }
+  # Nivel 2: las subcategorías dentro de una categoría de Fudo.
+  def subcategories_of(fudo_category_name)
+    @subcategories ||= {}
+    @subcategories[fudo_category_name] ||= begin
+      dentro = rows.select { |r| fudo_category_for(r) == fudo_category_name }
+      build_groups(dentro) { |r| assignments[r.ingredient_id] }.sort_by { |g| -g.spend }
+    end
   end
 
   def uncategorized = rows.reject { |r| assignments[r.ingredient_id] }
 
+  # Agrupa por subcategoría fina sobre todo el período (para su página propia).
+  def grouped_by_subcategory
+    @grouped_by_subcategory ||= build_groups { |r| assignments[r.ingredient_id] }.sort_by { |g| -g.spend }
+  end
+
   private
 
-  def build_groups
+  def build_groups(subconjunto = nil)
     total = total_spend
-    rows.group_by { |r| yield(r) }.map do |clave, grupo|
+    (subconjunto || rows).group_by { |r| yield(r) }.map do |clave, grupo|
       gasto = grupo.sum(&:spend)
       # La variación del grupo se pondera por gasto, igual que la canasta:
       # un insumo de $18M debe pesar más que uno de $5.000.
@@ -175,8 +195,7 @@ class IngredientPrices
       peso = comparables.sum(&:spend)
       Group.new(
         key:        clave,
-        area:       clave.is_a?(IngredientCategory) ? clave.area : clave,
-        name:       clave.is_a?(IngredientCategory) ? clave.name : (clave || "Sin categoría"),
+        name:       clave.is_a?(IngredientCategory) ? clave.name : (clave || "Sin subcategoría"),
         rows:       grupo,
         spend:      gasto,
         share:      total.positive? ? gasto / total * 100.0 : 0.0,

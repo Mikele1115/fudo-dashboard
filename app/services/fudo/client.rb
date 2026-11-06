@@ -150,6 +150,45 @@ module Fudo
       purchases
     end
 
+    # Catálogo de insumos con su categoría, tal como están en Fudo.
+    #
+    # OJO con `fields[ingredient]`: en JSON:API ese parámetro no recorta solo
+    # atributos, también **recorta las relaciones**. Pidiendo "name,unit" la
+    # respuesta llega sin `ingredientCategory` y parece que los insumos no
+    # tuvieran categoría, cuando sí la tienen. Por eso aquí no se restringe.
+    #
+    # Devuelve un array de:
+    #   { id:, name:, unit_name:, category_id:, category_name: }
+    def ingredients
+      found = []
+      page  = 1
+      loop do
+        body = get("/ingredients",
+                   "include"    => "ingredientCategory,unit",
+                   "sort"       => "id",
+                   "page[size]" => PAGE_SIZE,
+                   "page[number]" => page)
+        included = body.fetch("included", []).each_with_object({}) { |r, h| h[[r["type"], r["id"]]] = r }
+
+        rows = body.fetch("data", [])
+        rows.each do |row|
+          cat_ref  = row.dig("relationships", "ingredientCategory", "data")
+          unit_ref = row.dig("relationships", "unit", "data")
+          found << {
+            id:            row["id"].to_i,
+            name:          row.dig("attributes", "name").to_s,
+            unit_name:     unit_ref && included[[unit_ref["type"], unit_ref["id"]]]&.dig("attributes", "name"),
+            category_id:   cat_ref && cat_ref["id"].to_i,
+            category_name: cat_ref && included[[cat_ref["type"], cat_ref["id"]]]&.dig("attributes", "name")
+          }
+        end
+        break if rows.size < PAGE_SIZE
+
+        page += 1
+      end
+      found
+    end
+
     # Prueba de conexión: autentica y pide 1 venta.
     def ping
       token

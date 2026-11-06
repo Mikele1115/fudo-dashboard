@@ -96,27 +96,55 @@ class IngredientPricesCategoriesTest < ActiveSupport::TestCase
     )
   end
 
-  test "agrupa el gasto por área y por categoría" do
+  test "agrupa el gasto por la categoría de Fudo y, dentro, por tipo de insumo" do
     buy(name: "Mozzarella", ingredient_id: 1, unit_total: 80_000)
     buy(name: "Barril Coda", ingredient_id: 2, unit_total: 20_000)
+    Ingredient.create!(fudo_id: 1, name: "Mozzarella", fudo_category_name: "Ingredientes Pizza")
+    Ingredient.create!(fudo_id: 2, name: "Barril Coda", fudo_category_name: "Barriles")
     IngredientClassifier.run!
 
     a = IngredientPrices.new(period: "12", to: Date.new(2026, 10, 15))
-    areas = a.grouped_by_area.to_h { |g| [g.name, g] }
-    assert_in_delta 80.0, areas["Cocina"].share, 0.1
-    assert_in_delta 20.0, areas["Bar"].share, 0.1
-    assert_equal 1, areas["Cocina"].ingredients_count
+    cats = a.grouped_by_fudo_category.to_h { |g| [g.name, g] }
+    assert_in_delta 80.0, cats["Ingredientes Pizza"].share, 0.1
+    assert_in_delta 20.0, cats["Barriles"].share, 0.1
+    assert_equal ["Quesos"], a.subcategories_of("Ingredientes Pizza").map(&:name)
   end
 
-  test "los insumos sin categoría quedan aparte y no se pierden" do
-    buy(name: "Mozzarella", ingredient_id: 1, unit_total: 90_000)
-    buy(name: "Voila", ingredient_id: 2, unit_total: 10_000)
+  test "un mismo tipo puede aparecer en varias categorías de Fudo" do
+    # El caso real: hay queso en Pizza, en Postre y en Colación. Por eso la
+    # jerarquía no es fija: se agrupa por insumo, no por un árbol predefinido.
+    buy(name: "Mozzarella", ingredient_id: 1, unit_total: 60_000)
+    buy(name: "Queso mascarpone", ingredient_id: 2, unit_total: 40_000)
+    Ingredient.create!(fudo_id: 1, name: "Mozzarella", fudo_category_name: "Ingredientes Pizza")
+    Ingredient.create!(fudo_id: 2, name: "Queso mascarpone", fudo_category_name: "Ingredientes Postre")
     IngredientClassifier.run!
 
     a = IngredientPrices.new(period: "12", to: Date.new(2026, 10, 15))
-    assert_equal 1, a.uncategorized.size
+    assert_equal ["Quesos"], a.subcategories_of("Ingredientes Pizza").map(&:name)
+    assert_equal ["Quesos"], a.subcategories_of("Ingredientes Postre").map(&:name)
+  end
+
+  test "un insumo sin tipo asignado no se pierde del total" do
+    buy(name: "Mozzarella", ingredient_id: 1, unit_total: 90_000)
+    buy(name: "Voila", ingredient_id: 2, unit_total: 10_000)
+    Ingredient.create!(fudo_id: 1, name: "Mozzarella", fudo_category_name: "Ingredientes Pizza")
+    Ingredient.create!(fudo_id: 2, name: "Voila", fudo_category_name: "Ingredientes Barra")
+    IngredientClassifier.run!
+
+    a = IngredientPrices.new(period: "12", to: Date.new(2026, 10, 15))
+    assert_equal 1, a.uncategorized.size, "Voila no coincide con ninguna regla"
     assert_equal "Voila", a.uncategorized.first.name
-    sin = a.grouped_by_area.find { |g| g.name == "Sin categoría" }
-    assert_equal 10_000, sin.spend
+    # Aun sin tipo, sigue contando en su categoría de Fudo.
+    barra = a.grouped_by_fudo_category.find { |g| g.name == "Ingredientes Barra" }
+    assert_equal 10_000, barra.spend
+    assert_equal ["Sin subcategoría"], a.subcategories_of("Ingredientes Barra").map(&:name)
+  end
+
+  test "un insumo que no está en el catálogo de Fudo queda como Sin categoría" do
+    buy(name: "Tomate Cherry", ingredient_id: 7, unit_total: 5_000)
+    IngredientClassifier.run!
+
+    a = IngredientPrices.new(period: "12", to: Date.new(2026, 10, 15))
+    assert_equal Ingredient::SIN_CATEGORIA, a.grouped_by_fudo_category.first.name
   end
 end

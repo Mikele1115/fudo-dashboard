@@ -13,8 +13,11 @@ class SyncSalesJob < ApplicationJob
     # Las compras se actualizan solo en la tarea nocturna: el botón del dashboard
     # es para las ventas del día y debe responder rápido.
     PurchasesSync.catch_up!
-    # Un insumo nuevo cargado en Fudo se queda sin categoría hasta que pasan las
-    # reglas. Pasarlas aquí es seguro: nunca tocan lo asignado a mano.
+    # El catálogo trae la categoría que el usuario mantiene en Fudo: si allí
+    # recategoriza un insumo, aquí se refleja en esta corrida.
+    IngredientsSync.run!
+    # Un insumo nuevo se queda sin tipo hasta que pasan las reglas. Pasarlas
+    # aquí es seguro: nunca tocan lo asignado a mano.
     IngredientClassifier.run!
     # Fudo no tiene webhooks, así que los saltos de precio se detectan aquí,
     # sobre lo que acaba de descargarse.

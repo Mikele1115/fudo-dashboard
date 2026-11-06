@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_06_200446) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_06_211213) do
   create_table "daily_sales", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.date "date", null: false
@@ -63,6 +63,19 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_06_200446) do
     t.index ["fudo_ingredient_id", "purchased_on"], name: "idx_on_fudo_ingredient_id_purchased_on_fe9755771d"
     t.index ["fudo_item_id"], name: "index_ingredient_purchases_on_fudo_item_id", unique: true
     t.index ["purchased_on"], name: "index_ingredient_purchases_on_purchased_on"
+  end
+
+  create_table "ingredients", force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.integer "fudo_category_id"
+    t.string "fudo_category_name"
+    t.integer "fudo_id", null: false
+    t.string "name", null: false
+    t.datetime "synced_at"
+    t.string "unit_name"
+    t.datetime "updated_at", null: false
+    t.index ["fudo_category_name"], name: "index_ingredients_on_fudo_category_name"
+    t.index ["fudo_id"], name: "index_ingredients_on_fudo_id", unique: true
   end
 
   create_table "price_alerts", force: :cascade do |t|

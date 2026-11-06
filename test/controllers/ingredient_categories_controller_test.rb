@@ -30,7 +30,7 @@ class IngredientCategoriesControllerTest < ActionDispatch::IntegrationTest
 
   test "el detalle destaca las subidas de precio" do
     get ingredient_category_path(@quesos, period: "all")
-    assert_match "Subidas de precio en quesos", response.body
+    assert_match "Subidas de precio", response.body
     assert_match "+28,6%", response.body # 7.000 -> 9.000 por kg
   end
 

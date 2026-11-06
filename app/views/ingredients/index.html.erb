@@ -101,10 +101,11 @@
 <section class="card">
   <div class="card--actions">
     <div>
-      <h2>Por área y categoría</h2>
+      <h2>Por categoría</h2>
       <p class="muted small">
-        Todo viene cerrado. Abre solo el área o la categoría que te interese;
-        dentro de cada categoría están sus insumos con la evolución de su precio.
+        Arriba, tus categorías de Fudo —se sincronizan del POS, no se editan aquí—.
+        Dentro, el desglose por tipo de insumo, que Fudo no tiene y es el que deja
+        ver si lo que se mueve son los quesos o las harinas.
       </p>
     </div>
     <%= link_to "Editar categorías", ingredient_categories_path, class: "btn btn--light" %>
@@ -112,40 +113,44 @@
 
   <% if a.uncategorized.any? %>
     <p class="small">
-      <span class="tag tag--warn"><%= a.uncategorized.size %> sin categoría</span>
-      <span class="muted">No entran en el desglose. <%= link_to "Asignarlos", ingredient_categories_path(filter: "sin") %>.</span>
+      <span class="tag tag--warn"><%= a.uncategorized.size %> sin tipo asignado</span>
+      <span class="muted">Tienen categoría de Fudo pero no tipo de insumo. <%= link_to "Asignarlos", ingredient_categories_path(filter: "sin") %>.</span>
     </p>
   <% end %>
 
   <div class="acc__head">
-    <span>Área / categoría</span><span>Gasto</span><span>% del total</span><span>Variación</span><span>Insumos</span>
+    <span>Categoría / tipo</span><span>Gasto</span><span>% del total</span><span>Variación</span><span>Insumos</span>
   </div>
 
   <%# <details> nativo: el desplegable funciona sin JavaScript. %>
-  <% a.grouped_by_area.each do |area| %>
+  <% a.grouped_by_fudo_category.each do |cat| %>
     <details class="acc acc--area">
       <summary class="acc__row">
-        <span class="acc__name"><strong><%= area.name %></strong></span>
-        <span><strong><%= money(area.spend) %></strong></span>
-        <span><%= number_with_precision(area.share, precision: 1, separator: ",") %>%</span>
-        <span><%= area.change_pct ? price_change_badge(100 + area.change_pct, 100) : content_tag(:span, "—", class: "pct pct--na") %></span>
-        <span><%= int(area.ingredients_count) %></span>
+        <span class="acc__name"><strong><%= cat.name %></strong></span>
+        <span><strong><%= money(cat.spend) %></strong></span>
+        <span><%= number_with_precision(cat.share, precision: 1, separator: ",") %>%</span>
+        <span><%= cat.change_pct ? price_change_badge(100 + cat.change_pct, 100) : content_tag(:span, "—", class: "pct pct--na") %></span>
+        <span><%= int(cat.ingredients_count) %></span>
       </summary>
 
-      <% a.categories_of(area.name).each do |g| %>
+      <div class="acc__body acc__body--tight">
+        <p class="small"><%= link_to "Ver #{cat.name} completo, con alertas y gasto mes a mes →", fudo_category_path(cat.name, period: a.period_key) %></p>
+      </div>
+
+      <% a.subcategories_of(cat.name).each do |sub| %>
         <details class="acc acc--cat">
           <summary class="acc__row">
-            <span class="acc__name"><%= g.name %></span>
-            <span><%= money(g.spend) %></span>
-            <span class="muted"><%= number_with_precision(g.share, precision: 1, separator: ",") %>%</span>
-            <span><%= g.change_pct ? price_change_badge(100 + g.change_pct, 100) : content_tag(:span, "—", class: "pct pct--na") %></span>
-            <span class="muted"><%= int(g.ingredients_count) %></span>
+            <span class="acc__name"><%= sub.name %></span>
+            <span><%= money(sub.spend) %></span>
+            <span class="muted"><%= number_with_precision(sub.share, precision: 1, separator: ",") %>%</span>
+            <span><%= sub.change_pct ? price_change_badge(100 + sub.change_pct, 100) : content_tag(:span, "—", class: "pct pct--na") %></span>
+            <span class="muted"><%= int(sub.ingredients_count) %></span>
           </summary>
           <div class="acc__body">
-            <% if g.key %>
-              <p class="small"><%= link_to "Ver la categoría completa, con alertas y gasto mes a mes →", ingredient_category_path(g.key, period: a.period_key) %></p>
+            <% if sub.key %>
+              <p class="small"><%= link_to "Ver #{sub.name.downcase} en detalle, con alertas y gasto mes a mes →", ingredient_category_path(sub.key, period: a.period_key) %></p>
             <% end %>
-            <%= render "ingredients/mini_table", rows: g.rows, period: a.period_key %>
+            <%= render "ingredients/mini_table", rows: sub.rows, period: a.period_key %>
           </div>
         </details>
       <% end %>

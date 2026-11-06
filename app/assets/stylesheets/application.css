@@ -184,3 +184,4 @@ code { background: #eef0f3; padding: 1px 5px; border-radius: 4px; font-size: 12p
   .acc__row { grid-template-columns: 1fr auto; row-gap: 2px; }
   .acc__row span:nth-child(3), .acc__row span:nth-child(5) { display: none; }
 }
+.acc__body--tight { padding: 2px 0 8px 18px; }

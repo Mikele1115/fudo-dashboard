@@ -16,7 +16,7 @@ ALERTAS DE PRECIO (<%= r.alerts.size %>)
 <% end -%>
 <% end -%>
 
-POR ÁREA
+POR CATEGORÍA
 <% r.by_area.each do |a| -%>
   <%= a[:area] %>: <%= money(a[:spend]) %> (<%= number_with_precision(a[:share], precision: 1, separator: ",") %>%)<% if a[:previous].positive? %> — semana anterior <%= money(a[:previous]) %> (<%= pct_text(a[:spend], a[:previous]) %>)<% end %>
 <% end -%>

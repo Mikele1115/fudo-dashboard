@@ -39,8 +39,9 @@ app/
     daily_sale.rb        Total y tickets de cada día de negocio (tabla daily_sales)
     ingredient_purchase.rb  Una línea de compra de insumo (tabla ingredient_purchases)
     price_alert.rb       Aviso de que un insumo subió mucho de precio (tabla price_alerts)
-    ingredient_category.rb    Categoría de insumos dentro de un área del restaurante
-    ingredient_assignment.rb  A qué categoría pertenece cada insumo de Fudo
+    ingredient.rb             Catálogo de insumos de Fudo, con SU categoría (Fudo manda)
+    ingredient_category.rb    Tipo de insumo propio (Quesos, Embutidos…), el 2º nivel
+    ingredient_assignment.rb  Qué tipo tiene cada insumo, y si lo puso una regla o una persona
     sync_run.rb          Registro de cada sincronización con Fudo
     report_delivery.rb   Registro de cada envío del informe
   services/
@@ -51,7 +52,8 @@ app/
     price_alert_detector.rb  Detecta saltos de precio que cuestan dinero de verdad
     alert_notifier.rb    Agrupa las alertas pendientes en un solo correo
     weekly_purchases_report.rb  Resumen semanal de compras (lunes)
-    ingredient_classifier.rb    Catálogo de categorías y asignación por palabras clave
+    ingredients_sync.rb         Trae de Fudo el catálogo de insumos con su categoría
+    ingredient_classifier.rb    Catálogo de tipos y asignación por palabras clave
     metrics.rb           Calcula todos los indicadores de un día (una consulta, todo en memoria)
     month_report.rb      Vista mensual del historial
     report_sender.rb     Envía el informe y deja registro
@@ -167,34 +169,54 @@ bin/rails runner 'PurchasesSync.run!(from: Date.new(2024,1,1))'  # histórico
 bin/rails runner 'PurchasesSync.catch_up!'                       # incremental
 ```
 
-### Categorías: dos niveles, área y categoría
+### Categorías: dos niveles, Fudo arriba y tipo de insumo dentro
 
-Cada insumo pertenece a una **categoría** (Quesos, Cerveza y barriles, Envases…) y cada
-categoría a un **área** del restaurante (Cocina, Bar, Envases, Limpieza, Otros). Dos
-niveles a propósito: el área responde «cuánto gasta el bar» y la categoría «cuánto gasto
-en quesos», sin tener que elegir entre las dos.
+**Nivel 1 — la categoría de Fudo.** Ingredientes Pizza, Ingredientes Barra, Barriles,
+Ingredientes Postre, Colación. Las mantiene el usuario en el POS; aquí solo se copian
+(`IngredientsSync`) y **no se editan**. Si recategoriza un insumo en Fudo, el dashboard
+lo refleja en la siguiente sincronización.
 
-Se gestionan en `/insumos/categorias`.
+**Nivel 2 — el tipo de insumo.** Quesos, Embutidos y carnes, Verduras y frutas… Esto
+Fudo no lo tiene, y hace falta: «Ingredientes Pizza» es el 75% del gasto, y sin este
+detalle no se distingue si lo que subió fue el queso o la harina.
 
-**Por qué no se usan las categorías de Fudo.** Se comprobó contra la cuenta real: de 223
-insumos, **ninguno** tenía categoría asignada en el POS, y la API **no tiene endpoint para
-crear categorías de insumos** — habría que crearlas y asignarlas a mano, una por una, en
-la interfaz de Fudo. Aquí las reglas automáticas resuelven casi todo en segundos.
+La jerarquía **no es fija**: un tipo puede aparecer dentro de varias categorías de Fudo.
+Hay queso en Pizza, en Postre y en Colación. Se agrupa por insumo, no por un árbol
+predefinido.
 
-**Las reglas** (`IngredientClassifier::CATALOGO`) clasifican por palabras clave del nombre.
-Medido contra 12 meses reales: asignan solas **167 de 170 insumos**. El orden importa —
-gana la primera regla que coincide, así que las específicas van antes que las genéricas
-("salsa de tomate" antes que "tomate").
+#### El error que costó una vuelta entera
+
+La primera versión de esto concluyó que Fudo no tenía los insumos categorizados, y se
+construyó un catálogo propio de 17 categorías sobre esa premisa falsa. La causa: la
+consulta pedía `fields[ingredient]=name,unit` para traer menos datos, y en JSON:API ese
+parámetro **no recorta solo atributos, también recorta las relaciones**. Sin pedir
+`ingredientCategory` explícitamente, la API la omite y parece que no existiera.
+
+Por eso `Fudo::Client#ingredients` **no restringe campos**. Si alguna vez se optimiza esa
+llamada, comprobar que la categoría sigue llegando.
+
+#### Asignación del tipo de insumo
+
+`IngredientClassifier` clasifica por palabras clave del nombre: asigna solo 167 de 170
+insumos. El orden del catálogo importa — gana la primera regla que coincide, así que las
+específicas van antes que las genéricas («salsa de tomate» antes que «tomate»).
 
 **Regla de oro: lo que asigna una persona nunca se pisa.** La columna `automatic` de
 `ingredient_assignments` distingue lo puesto por una regla de lo decidido por el usuario;
-`IngredientClassifier.run!` solo toca lo primero. Por eso el botón «Volver a aplicar
-reglas» es seguro de pulsar en cualquier momento.
+`run!` solo toca lo primero. Por eso el botón «Volver a aplicar reglas» es seguro siempre.
 
 Las asignaciones se guardan por `fudo_ingredient_id`, nunca por nombre: en Fudo los
 insumos se renombran y la categoría no debe perderse por eso.
 
-El desglose por área y categoría aparece en la pestaña Insumos y en el correo semanal.
+#### Lo que se ve
+
+- **Pestaña Insumos**: acordeón cerrado por defecto. Se abre una categoría de Fudo, dentro
+  están sus tipos, y dentro de cada tipo sus insumos con la minigráfica de evolución del
+  precio. Hecho con `<details>` nativos, sin JavaScript.
+- **`/insumos/fudo/:nombre`**: detalle de una categoría de Fudo, con su desglose por tipo.
+- **`/insumos/categorias/:id`**: detalle de un tipo de insumo.
+- **`/insumos/categorias`**: pantalla para asignar tipos y crear los que falten.
+- El correo semanal trae el gasto por categoría de Fudo contra la semana anterior.
 
 ### Alertas de precio
 
