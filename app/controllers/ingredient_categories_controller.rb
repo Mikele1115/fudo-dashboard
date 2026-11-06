@@ -9,6 +9,18 @@ class IngredientCategoriesController < ApplicationController
     @rows       = filtered_rows
   end
 
+  # Detalle de una categoría: sus insumos, cómo se movieron sus precios y
+  # cuánto se gastó mes a mes.
+  def show
+    @category = IngredientCategory.find(params[:id])
+    @prices   = IngredientPrices.new(period: params[:period])
+    @group    = @prices.grouped_by_category.find { |g| g.key&.id == @category.id }
+    @rows     = (@group&.rows || []).sort_by { |r| -r.spend }
+    @ids      = @rows.map(&:ingredient_id)
+    @alerts   = PriceAlert.where(fudo_ingredient_id: @ids).recent.limit(10)
+    @monthly  = monthly_spend(@ids)
+  end
+
   # Guarda de una vez todas las asignaciones cambiadas en la pantalla.
   def update
     cambios = 0
@@ -37,6 +49,24 @@ class IngredientCategoriesController < ApplicationController
   end
 
   private
+
+  # Gasto mes a mes de un grupo de insumos, para el gráfico del detalle.
+  def monthly_spend(ingredient_ids)
+    return { labels: [], data: [] } if ingredient_ids.empty?
+
+    desde = @prices.from.beginning_of_month
+    hasta = @prices.to
+    por_mes = IngredientPurchase.where(fudo_ingredient_id: ingredient_ids, purchased_on: desde..hasta)
+                                .group_by { |p| p.purchased_on.beginning_of_month }
+                                .transform_values { |ps| ps.sum { |p| p.line_total.to_f }.round }
+    meses = []
+    m = desde
+    while m <= hasta
+      meses << m
+      m = m.next_month
+    end
+    { labels: meses.map { |x| x.strftime("%m/%y") }, data: meses.map { |x| por_mes[x] || 0 } }
+  end
 
   def filtered_rows
     todas = @prices.rows.sort_by { |r| -r.spend }

@@ -94,14 +94,14 @@
         <% a.grouped_by_category.reject(&:sin_categoria?).each do |g| %>
           <tr>
             <td class="muted"><%= g.area %></td>
-            <td><%= g.name %></td>
+            <td><%= link_to g.name, ingredient_category_path(g.key) %></td>
             <td><%= int(g.ingredients_count) %></td>
             <td><%= money(g.spend) %></td>
           </tr>
         <% end %>
         <% (@categories.map(&:id) - a.grouped_by_category.filter_map { |g| g.key&.id }).each do |id| %>
           <% c = @categories.find { |x| x.id == id } %>
-          <tr><td class="muted"><%= c.area %></td><td><%= c.name %></td><td class="muted">0</td><td class="muted">—</td></tr>
+          <tr><td class="muted"><%= c.area %></td><td><%= link_to c.name, ingredient_category_path(c) %></td><td class="muted">0</td><td class="muted">—</td></tr>
         <% end %>
       </table>
     </div>

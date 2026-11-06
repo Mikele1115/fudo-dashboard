@@ -132,7 +132,7 @@
         </tr>
         <% a.categories_of(area.name).each do |g| %>
           <tr>
-            <td class="cell--indent"><%= g.name %></td>
+            <td class="cell--indent"><%= g.key ? link_to(g.name, ingredient_category_path(g.key, period: a.period_key)) : g.name %></td>
             <td><%= money(g.spend) %></td>
             <td class="muted"><%= number_with_precision(g.share, precision: 1, separator: ",") %>%</td>
             <td><%= g.change_pct ? price_change_badge(100 + g.change_pct, 100) : content_tag(:span, "—", class: "pct pct--na") %></td>
