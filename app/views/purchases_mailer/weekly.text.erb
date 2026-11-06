@@ -16,6 +16,11 @@ ALERTAS DE PRECIO (<%= r.alerts.size %>)
 <% end -%>
 <% end -%>
 
+POR ÁREA
+<% r.by_area.each do |a| -%>
+  <%= a[:area] %>: <%= money(a[:spend]) %> (<%= number_with_precision(a[:share], precision: 1, separator: ",") %>%)<% if a[:previous].positive? %> — semana anterior <%= money(a[:previous]) %> (<%= pct_text(a[:spend], a[:previous]) %>)<% end %>
+<% end -%>
+
 EN QUÉ SE FUE LA PLATA
 <% r.top_spend(12).each do |l| -%>
   <%= l.name %>: <%= money(l.spend) %> — <%= number_with_precision(l.quantity, precision: 1) %> <%= l.unit_label %> a <%= money(l.last_price) %><% if l.change_pct %> (<%= pct_text(l.last_price, l.prev_price) %>)<% end %>

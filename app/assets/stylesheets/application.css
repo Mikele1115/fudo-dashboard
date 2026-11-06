@@ -140,3 +140,12 @@ code { background: #eef0f3; padding: 1px 5px; border-radius: 4px; font-size: 12p
 .card--alert { border-left: 4px solid #f59e0b; background: var(--warn-bg); }
 .card--alert h2 { color: var(--warn); }
 .btn--small { padding: 3px 9px; font-size: 12px; }
+.form-actions { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+.stack { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.stack .field { width: 100%; }
+.stack select, .stack input { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font: inherit; background: #fff; width: 100%; }
+.sep { border: 0; border-top: 1px solid var(--border); margin: 16px 0; }
+.table--rows tr.is-warn td { background: var(--warn-bg); }
+.table td select { padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; font: inherit; font-size: 13px; background: #fff; max-width: 220px; }
+.row--area td { background: #f9fafb; border-top: 2px solid var(--border); }
+.cell--indent { padding-left: 22px !important; }

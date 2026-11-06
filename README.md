@@ -39,6 +39,8 @@ app/
     daily_sale.rb        Total y tickets de cada día de negocio (tabla daily_sales)
     ingredient_purchase.rb  Una línea de compra de insumo (tabla ingredient_purchases)
     price_alert.rb       Aviso de que un insumo subió mucho de precio (tabla price_alerts)
+    ingredient_category.rb    Categoría de insumos dentro de un área del restaurante
+    ingredient_assignment.rb  A qué categoría pertenece cada insumo de Fudo
     sync_run.rb          Registro de cada sincronización con Fudo
     report_delivery.rb   Registro de cada envío del informe
   services/
@@ -48,7 +50,8 @@ app/
     ingredient_prices.rb Comportamiento de los precios: medianas, ventanas y filtro de datos dudosos
     price_alert_detector.rb  Detecta saltos de precio que cuestan dinero de verdad
     alert_notifier.rb    Agrupa las alertas pendientes en un solo correo
-    weekly_purchases_report.rb  Resumen semanal de compras (viernes)
+    weekly_purchases_report.rb  Resumen semanal de compras (lunes)
+    ingredient_classifier.rb    Catálogo de categorías y asignación por palabras clave
     metrics.rb           Calcula todos los indicadores de un día (una consulta, todo en memoria)
     month_report.rb      Vista mensual del historial
     report_sender.rb     Envía el informe y deja registro
@@ -58,7 +61,7 @@ app/
     weekly_purchases_report_job.rb  Tarea programada: resumen semanal de compras
   mailers/report_mailer.rb     + app/views/report_mailer/daily.{html,text}.erb
   mailers/purchases_mailer.rb  + app/views/purchases_mailer/{weekly,price_alerts}.{html,text}.erb
-  controllers/           dashboard, history, ingredients, price_alerts, syncs, reports (todos delgados)
+  controllers/           dashboard, history, ingredients, ingredient_categories, price_alerts, syncs, reports
   views/                 dashboard/show, history/index, ingredients/{index,show}, layouts/application
   helpers/format_helper.rb      money, porcentajes y fechas en español (web y correo)
   helpers/ingredients_helper.rb minigráfico SVG y variación de precios (colores invertidos)
@@ -163,6 +166,35 @@ En consola:
 bin/rails runner 'PurchasesSync.run!(from: Date.new(2024,1,1))'  # histórico
 bin/rails runner 'PurchasesSync.catch_up!'                       # incremental
 ```
+
+### Categorías: dos niveles, área y categoría
+
+Cada insumo pertenece a una **categoría** (Quesos, Cerveza y barriles, Envases…) y cada
+categoría a un **área** del restaurante (Cocina, Bar, Envases, Limpieza, Otros). Dos
+niveles a propósito: el área responde «cuánto gasta el bar» y la categoría «cuánto gasto
+en quesos», sin tener que elegir entre las dos.
+
+Se gestionan en `/insumos/categorias`.
+
+**Por qué no se usan las categorías de Fudo.** Se comprobó contra la cuenta real: de 223
+insumos, **ninguno** tenía categoría asignada en el POS, y la API **no tiene endpoint para
+crear categorías de insumos** — habría que crearlas y asignarlas a mano, una por una, en
+la interfaz de Fudo. Aquí las reglas automáticas resuelven casi todo en segundos.
+
+**Las reglas** (`IngredientClassifier::CATALOGO`) clasifican por palabras clave del nombre.
+Medido contra 12 meses reales: asignan solas **167 de 170 insumos**. El orden importa —
+gana la primera regla que coincide, así que las específicas van antes que las genéricas
+("salsa de tomate" antes que "tomate").
+
+**Regla de oro: lo que asigna una persona nunca se pisa.** La columna `automatic` de
+`ingredient_assignments` distingue lo puesto por una regla de lo decidido por el usuario;
+`IngredientClassifier.run!` solo toca lo primero. Por eso el botón «Volver a aplicar
+reglas» es seguro de pulsar en cualquier momento.
+
+Las asignaciones se guardan por `fudo_ingredient_id`, nunca por nombre: en Fudo los
+insumos se renombran y la categoría no debe perderse por eso.
+
+El desglose por área y categoría aparece en la pestaña Insumos y en el correo semanal.
 
 ### Alertas de precio
 

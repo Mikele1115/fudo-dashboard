@@ -1,0 +1,132 @@
+<% a = @prices %>
+<% sin_categoria = a.uncategorized.size %>
+
+<section class="page-head">
+  <div>
+    <h1>Categorías de insumos</h1>
+    <p class="muted">
+      Cada insumo pertenece a una categoría, y cada categoría a un área del restaurante.
+      Así el análisis responde tanto «cuánto gasta el bar» como «cuánto gasto en quesos».
+    </p>
+  </div>
+  <%= link_to "‹ Volver a insumos", ingredients_path, class: "btn btn--ghost" %>
+</section>
+
+<% if sin_categoria.positive? %>
+  <section class="card card--alert">
+    <h2>⚠ <%= sin_categoria %> insumo<%= "s" if sin_categoria > 1 %> sin categoría</h2>
+    <p class="muted small">
+      No entran en el desglose por área. Asígnalos abajo: están los primeros de la lista.
+    </p>
+  </section>
+<% end %>
+
+<section class="card">
+  <div class="card--actions">
+    <div>
+      <h2>Asignar insumos</h2>
+      <p class="muted small">
+        Cambia los que quieras y pulsa Guardar al final. Lo que asignes a mano queda fijo:
+        una nueva pasada de las reglas automáticas no lo toca.
+      </p>
+    </div>
+    <form method="get" action="<%= ingredient_categories_path %>" class="toolbar">
+      <select name="filter" onchange="this.form.requestSubmit()">
+        <option value="todos"  <%= "selected" if @filter == "todos" %>>Todos los insumos</option>
+        <option value="sin"    <%= "selected" if @filter == "sin" %>>Sin categoría</option>
+        <option value="auto"   <%= "selected" if @filter == "auto" %>>Asignados por regla</option>
+        <option value="manual" <%= "selected" if @filter == "manual" %>>Asignados a mano</option>
+      </select>
+    </form>
+  </div>
+
+  <%= form_with url: ingredient_categories_path, method: :patch, data: { turbo: false } do %>
+    <%= hidden_field_tag :filter, @filter %>
+    <table class="table table--rows">
+      <thead>
+        <tr><th>Insumo</th><th>Gasto 12 meses</th><th>Compras</th><th>Origen</th><th>Categoría</th></tr>
+      </thead>
+      <tbody>
+        <% @rows.each do |r| %>
+          <% asignacion = a.assignments[r.ingredient_id] %>
+          <tr class="<%= "is-warn" if asignacion.nil? %>">
+            <td>
+              <%= link_to r.name, ingredient_path(r.ingredient_id) %>
+              <span class="muted small">/ <%= r.unit_label %></span>
+            </td>
+            <td><%= money(r.spend) %></td>
+            <td><%= int(r.purchases_count) %></td>
+            <td class="muted small"><%= assignment_origin(r.ingredient_id) %></td>
+            <td>
+              <select name="assignments[<%= r.ingredient_id %>]">
+                <option value="">— sin categoría —</option>
+                <% IngredientCategory.by_area.each do |area, cats| %>
+                  <optgroup label="<%= area %>">
+                    <% cats.each do |c| %>
+                      <option value="<%= c.id %>" <%= "selected" if asignacion&.id == c.id %>><%= c.name %></option>
+                    <% end %>
+                  </optgroup>
+                <% end %>
+              </select>
+            </td>
+          </tr>
+        <% end %>
+        <% if @rows.empty? %>
+          <tr><td colspan="5" class="muted">No hay insumos que coincidan con el filtro.</td></tr>
+        <% end %>
+      </tbody>
+    </table>
+    <div class="form-actions">
+      <%= submit_tag "Guardar cambios", class: "btn btn--primary" %>
+      <span class="muted small"><%= @rows.size %> insumos en pantalla</span>
+    </div>
+  <% end %>
+</section>
+
+<section class="card">
+  <h2>Categorías existentes</h2>
+  <p class="muted small">Si te falta alguna, créala aquí y luego asígnale insumos arriba.</p>
+
+  <div class="grid-2">
+    <div>
+      <table class="table">
+        <tr><th>Área</th><th>Categoría</th><th>Insumos</th><th>Gasto 12 meses</th></tr>
+        <% a.grouped_by_category.reject(&:sin_categoria?).each do |g| %>
+          <tr>
+            <td class="muted"><%= g.area %></td>
+            <td><%= g.name %></td>
+            <td><%= int(g.ingredients_count) %></td>
+            <td><%= money(g.spend) %></td>
+          </tr>
+        <% end %>
+        <% (@categories.map(&:id) - a.grouped_by_category.filter_map { |g| g.key&.id }).each do |id| %>
+          <% c = @categories.find { |x| x.id == id } %>
+          <tr><td class="muted"><%= c.area %></td><td><%= c.name %></td><td class="muted">0</td><td class="muted">—</td></tr>
+        <% end %>
+      </table>
+    </div>
+    <div>
+      <h2>Nueva categoría</h2>
+      <%= form_with url: create_ingredient_category_path, method: :post, data: { turbo: false }, class: "stack" do %>
+        <label class="field">
+          <span>Nombre</span>
+          <%= text_field_tag :name, nil, placeholder: "Ej. Pastas frescas", required: true %>
+        </label>
+        <label class="field">
+          <span>Área</span>
+          <select name="area">
+            <% IngredientCategory::AREAS.each { |x| %><option value="<%= x %>"><%= x %></option><% } %>
+          </select>
+        </label>
+        <%= submit_tag "Crear categoría", class: "btn btn--light" %>
+      <% end %>
+
+      <hr class="sep">
+      <p class="muted small">
+        Las reglas automáticas clasifican por palabras clave en el nombre del insumo.
+        Si cargas insumos nuevos en Fudo, vuelve a pasarlas: solo tocan lo que no has asignado tú.
+      </p>
+      <%= button_to "Volver a aplicar reglas", reclassify_ingredient_categories_path, class: "btn btn--light", form_class: "inline" %>
+    </div>
+  </div>
+</section>

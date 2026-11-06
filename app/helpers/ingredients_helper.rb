@@ -70,6 +70,14 @@ module IngredientsHelper
     n < 3 ? tag.span("pocos datos", class: "tag tag--warn", title: "La variación se calcula con #{n} compra(s) en cada extremo") : ""
   end
 
+  # "a mano" / "por regla" / "—": de dónde salió la categoría de un insumo.
+  def assignment_origin(ingredient_id)
+    a = IngredientAssignment.find_by(fudo_ingredient_id: ingredient_id)
+    return "—" if a.nil?
+
+    a.automatic ? "por regla" : tag.strong("a mano")
+  end
+
   def unit_price(row_or_value, unit = nil)
     value = row_or_value.respond_to?(:recent_price) ? row_or_value.recent_price : row_or_value
     unit  = row_or_value.unit_label if unit.nil? && row_or_value.respond_to?(:unit_label)

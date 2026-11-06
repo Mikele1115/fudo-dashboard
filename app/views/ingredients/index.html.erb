@@ -98,6 +98,52 @@
   </div>
 </section>
 
+<section class="card">
+  <div class="card--actions">
+    <div>
+      <h2>Por área y categoría</h2>
+      <p class="muted small">
+        El área responde «cuánto gasta el bar»; la categoría, «cuánto gasto en quesos».
+        La variación se pondera por gasto: un insumo de $18M pesa más que uno de $5.000.
+      </p>
+    </div>
+    <%= link_to "Editar categorías", ingredient_categories_path, class: "btn btn--light" %>
+  </div>
+
+  <% if a.uncategorized.any? %>
+    <p class="small">
+      <span class="tag tag--warn"><%= a.uncategorized.size %> sin categoría</span>
+      <span class="muted">No entran en el desglose. <%= link_to "Asignarlos", ingredient_categories_path(filter: "sin") %>.</span>
+    </p>
+  <% end %>
+
+  <table class="table">
+    <thead>
+      <tr><th>Área / categoría</th><th>Gasto</th><th>% del total</th><th>Variación</th><th>Insumos</th></tr>
+    </thead>
+    <tbody>
+      <% a.grouped_by_area.each do |area| %>
+        <tr class="row--area">
+          <td><strong><%= area.name %></strong></td>
+          <td><strong><%= money(area.spend) %></strong></td>
+          <td><%= number_with_precision(area.share, precision: 1, separator: ",") %>%</td>
+          <td><%= area.change_pct ? price_change_badge(100 + area.change_pct, 100) : content_tag(:span, "—", class: "pct pct--na") %></td>
+          <td><%= int(area.ingredients_count) %></td>
+        </tr>
+        <% a.categories_of(area.name).each do |g| %>
+          <tr>
+            <td class="cell--indent"><%= g.name %></td>
+            <td><%= money(g.spend) %></td>
+            <td class="muted"><%= number_with_precision(g.share, precision: 1, separator: ",") %>%</td>
+            <td><%= g.change_pct ? price_change_badge(100 + g.change_pct, 100) : content_tag(:span, "—", class: "pct pct--na") %></td>
+            <td class="muted"><%= int(g.ingredients_count) %></td>
+          </tr>
+        <% end %>
+      <% end %>
+    </tbody>
+  </table>
+</section>
+
 <div class="grid-2">
   <section class="card">
     <h2>Los que más subieron</h2>

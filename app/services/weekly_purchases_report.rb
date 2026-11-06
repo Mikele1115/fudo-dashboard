@@ -106,11 +106,35 @@ class WeeklyPurchasesReport
     end
   end
 
+
+  # Gasto de la semana repartido por área del restaurante, con la semana anterior
+  # al lado. Devuelve [{ area:, spend:, previous:, share: }, ...] de mayor a menor.
+  def by_area
+    @by_area ||= begin
+      cats    = IngredientAssignment.category_by_ingredient
+      actual  = agrupar_por_area(purchases, cats)
+      pasada  = agrupar_por_area(previous.purchases, cats)
+      total   = spend
+
+      actual.map { |area, gasto|
+        { area: area, spend: gasto, previous: pasada[area] || 0.0,
+          share: total.positive? ? gasto / total * 100.0 : 0.0 }
+      }.sort_by { |h| -h[:spend] }
+    end
+  end
+
   def subject
     "Compras de la semana — #{money_label(spend)} en #{count} compras"
   end
 
   private
+
+  def agrupar_por_area(lineas, cats)
+    lineas.each_with_object(Hash.new(0.0)) do |p, h|
+      area = cats[p.fudo_ingredient_id]&.area || "Sin categoría"
+      h[area] += p.line_total.to_f
+    end
+  end
 
   # Último precio limpio pagado por ese insumo ANTES de esta semana.
   def previous_price_for(ingredient_id)

@@ -134,6 +134,59 @@ class IngredientPrices
     end
   end
 
+
+  # ---------- desglose por categoría y por área ----------
+
+  # Resumen de un grupo de insumos (una categoría o un área completa).
+  Group = Struct.new(:key, :area, :name, :rows, :spend, :share, :change_pct, keyword_init: true) do
+    def ingredients_count = rows.size
+    def sin_categoria?    = key.nil?
+  end
+
+  # { fudo_ingredient_id => IngredientCategory }
+  def assignments = @assignments ||= IngredientAssignment.category_by_ingredient
+
+  def grouped_by_category
+    @grouped_by_category ||= build_groups { |r| assignments[r.ingredient_id] }
+      .sort_by { |g| [-g.spend] }
+  end
+
+  def grouped_by_area
+    @grouped_by_area ||= build_groups { |r| assignments[r.ingredient_id]&.area }
+      .sort_by { |g| -g.spend }
+  end
+
+  # Categorías de un área, para el detalle.
+  def categories_of(area)
+    grouped_by_category.select { |g| g.area == area }
+  end
+
+  def uncategorized = rows.reject { |r| assignments[r.ingredient_id] }
+
+  private
+
+  def build_groups
+    total = total_spend
+    rows.group_by { |r| yield(r) }.map do |clave, grupo|
+      gasto = grupo.sum(&:spend)
+      # La variación del grupo se pondera por gasto, igual que la canasta:
+      # un insumo de $18M debe pesar más que uno de $5.000.
+      comparables = grupo.select { |r| r.change_pct && r.spend.positive? }
+      peso = comparables.sum(&:spend)
+      Group.new(
+        key:        clave,
+        area:       clave.is_a?(IngredientCategory) ? clave.area : clave,
+        name:       clave.is_a?(IngredientCategory) ? clave.name : (clave || "Sin categoría"),
+        rows:       grupo,
+        spend:      gasto,
+        share:      total.positive? ? gasto / total * 100.0 : 0.0,
+        change_pct: peso.zero? ? nil : comparables.sum { |r| r.change_pct * r.spend } / peso
+      )
+    end
+  end
+
+  public
+
   def period_label = PERIODS[@period_key]
   def window_days  = WINDOW_DAYS
 

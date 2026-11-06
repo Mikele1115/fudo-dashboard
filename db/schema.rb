@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_05_025404) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_06_200446) do
   create_table "daily_sales", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.date "date", null: false
@@ -22,6 +22,27 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_05_025404) do
     t.decimal "total", precision: 14, scale: 2, default: "0.0", null: false
     t.datetime "updated_at", null: false
     t.index ["date"], name: "index_daily_sales_on_date", unique: true
+  end
+
+  create_table "ingredient_assignments", force: :cascade do |t|
+    t.boolean "automatic", default: false, null: false
+    t.datetime "created_at", null: false
+    t.integer "fudo_ingredient_id", null: false
+    t.integer "ingredient_category_id", null: false
+    t.string "ingredient_name"
+    t.datetime "updated_at", null: false
+    t.index ["fudo_ingredient_id"], name: "index_ingredient_assignments_on_fudo_ingredient_id", unique: true
+    t.index ["ingredient_category_id"], name: "index_ingredient_assignments_on_ingredient_category_id"
+  end
+
+  create_table "ingredient_categories", force: :cascade do |t|
+    t.string "area", null: false
+    t.datetime "created_at", null: false
+    t.string "name", null: false
+    t.integer "position", default: 0, null: false
+    t.datetime "updated_at", null: false
+    t.index ["area", "position"], name: "index_ingredient_categories_on_area_and_position"
+    t.index ["name"], name: "index_ingredient_categories_on_name", unique: true
   end
 
   create_table "ingredient_purchases", force: :cascade do |t|
@@ -108,5 +129,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_05_025404) do
     t.index ["email_address"], name: "index_users_on_email_address", unique: true
   end
 
+  add_foreign_key "ingredient_assignments", "ingredient_categories"
   add_foreign_key "sessions", "users"
 end
