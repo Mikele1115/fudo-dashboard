@@ -103,8 +103,8 @@
     <div>
       <h2>Por área y categoría</h2>
       <p class="muted small">
-        El área responde «cuánto gasta el bar»; la categoría, «cuánto gasto en quesos».
-        La variación se pondera por gasto: un insumo de $18M pesa más que uno de $5.000.
+        Todo viene cerrado. Abre solo el área o la categoría que te interese;
+        dentro de cada categoría están sus insumos con la evolución de su precio.
       </p>
     </div>
     <%= link_to "Editar categorías", ingredient_categories_path, class: "btn btn--light" %>
@@ -117,31 +117,40 @@
     </p>
   <% end %>
 
-  <table class="table">
-    <thead>
-      <tr><th>Área / categoría</th><th>Gasto</th><th>% del total</th><th>Variación</th><th>Insumos</th></tr>
-    </thead>
-    <tbody>
-      <% a.grouped_by_area.each do |area| %>
-        <tr class="row--area">
-          <td><strong><%= area.name %></strong></td>
-          <td><strong><%= money(area.spend) %></strong></td>
-          <td><%= number_with_precision(area.share, precision: 1, separator: ",") %>%</td>
-          <td><%= area.change_pct ? price_change_badge(100 + area.change_pct, 100) : content_tag(:span, "—", class: "pct pct--na") %></td>
-          <td><%= int(area.ingredients_count) %></td>
-        </tr>
-        <% a.categories_of(area.name).each do |g| %>
-          <tr>
-            <td class="cell--indent"><%= g.key ? link_to(g.name, ingredient_category_path(g.key, period: a.period_key)) : g.name %></td>
-            <td><%= money(g.spend) %></td>
-            <td class="muted"><%= number_with_precision(g.share, precision: 1, separator: ",") %>%</td>
-            <td><%= g.change_pct ? price_change_badge(100 + g.change_pct, 100) : content_tag(:span, "—", class: "pct pct--na") %></td>
-            <td class="muted"><%= int(g.ingredients_count) %></td>
-          </tr>
-        <% end %>
+  <div class="acc__head">
+    <span>Área / categoría</span><span>Gasto</span><span>% del total</span><span>Variación</span><span>Insumos</span>
+  </div>
+
+  <%# <details> nativo: el desplegable funciona sin JavaScript. %>
+  <% a.grouped_by_area.each do |area| %>
+    <details class="acc acc--area">
+      <summary class="acc__row">
+        <span class="acc__name"><strong><%= area.name %></strong></span>
+        <span><strong><%= money(area.spend) %></strong></span>
+        <span><%= number_with_precision(area.share, precision: 1, separator: ",") %>%</span>
+        <span><%= area.change_pct ? price_change_badge(100 + area.change_pct, 100) : content_tag(:span, "—", class: "pct pct--na") %></span>
+        <span><%= int(area.ingredients_count) %></span>
+      </summary>
+
+      <% a.categories_of(area.name).each do |g| %>
+        <details class="acc acc--cat">
+          <summary class="acc__row">
+            <span class="acc__name"><%= g.name %></span>
+            <span><%= money(g.spend) %></span>
+            <span class="muted"><%= number_with_precision(g.share, precision: 1, separator: ",") %>%</span>
+            <span><%= g.change_pct ? price_change_badge(100 + g.change_pct, 100) : content_tag(:span, "—", class: "pct pct--na") %></span>
+            <span class="muted"><%= int(g.ingredients_count) %></span>
+          </summary>
+          <div class="acc__body">
+            <% if g.key %>
+              <p class="small"><%= link_to "Ver la categoría completa, con alertas y gasto mes a mes →", ingredient_category_path(g.key, period: a.period_key) %></p>
+            <% end %>
+            <%= render "ingredients/mini_table", rows: g.rows, period: a.period_key %>
+          </div>
+        </details>
       <% end %>
-    </tbody>
-  </table>
+    </details>
+  <% end %>
 </section>
 
 <div class="grid-2">

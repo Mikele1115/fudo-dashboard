@@ -1,0 +1,30 @@
+<%# Insumos de una categoría, en versión compacta para el acordeón.
+    Espera: rows (filas de IngredientPrices) y period. %>
+<table class="table table--mini">
+  <thead>
+    <tr>
+      <th>Insumo</th><th>Evolución</th><th>Precio actual</th><th>Antes</th>
+      <th>Variación</th><th>Compras</th><th>Gasto</th><th>Última</th>
+    </tr>
+  </thead>
+  <tbody>
+    <% rows.sort_by { |r| -r.spend }.each do |r| %>
+      <tr>
+        <td>
+          <%= link_to r.name, ingredient_path(r.ingredient_id, period: period) %>
+          <span class="muted small">/ <%= r.unit_label %></span>
+          <% if r.suspicious_count.positive? %>
+            <span class="tag tag--warn" title="<%= r.suspicious_count %> compra(s) con precio fuera de rango, excluidas del cálculo"><%= r.suspicious_count %> dudosa<%= "s" if r.suspicious_count > 1 %></span>
+          <% end %>
+        </td>
+        <td><%= price_sparkline(r.series) %></td>
+        <td><strong><%= money(r.recent_price) %></strong></td>
+        <td><%= money(r.baseline_price) %></td>
+        <td><%= price_change_badge(r.recent_price, r.baseline_price) %> <%= confidence_note(r) %></td>
+        <td><%= int(r.purchases_count) %></td>
+        <td><%= money(r.spend) %></td>
+        <td class="muted small"><%= r.last_date.strftime("%d/%m/%y") %></td>
+      </tr>
+    <% end %>
+  </tbody>
+</table>
