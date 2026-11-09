@@ -5,7 +5,7 @@
     <h1>Insumos</h1>
     <p class="muted">
       Comportamiento de los precios de compra entre el <%= a.from.strftime("%d/%m/%Y") %> y el <%= a.to.strftime("%d/%m/%Y") %>.
-      Precios netos, sin IVA.
+      Precios netos, sin IVA. Las variaciones comparan los primeros <%= a.window_days %> días del período con los últimos <%= a.window_days %>.
     </p>
   </div>
   <%# Ojo: el botón de actualizar va FUERA del formulario del período.
@@ -73,7 +73,14 @@
         <span class="<%= a.basket_change_pct.positive? ? 'txt--bad' : 'txt--good' %>"><%= pct_text(a.basket_change_pct + 100, 100) %></span>
       <% else %>—<% end %>
     </div>
-    <div class="kpi__delta muted">variación media, ponderada por gasto</div>
+    <div class="kpi__delta muted">
+      ponderada por gasto, sobre <%= int(a.reliable_rows.size) %> insumos
+      <% if a.unreliable_count.positive? %>
+        <span title="Quedan fuera las variaciones con menos de <%= IngredientPrices::MIN_CONFIDENCE %> compras en algún extremo: un insumo con dos compras no debe mover el índice">
+          (<%= int(a.unreliable_count) %> fuera por pocos datos)
+        </span>
+      <% end %>
+    </div>
   </div>
   <% impact = a.spend_impact_total %>
   <div class="kpi">

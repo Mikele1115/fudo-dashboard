@@ -62,12 +62,14 @@ module IngredientsHelper
     end
   end
 
-  # Cuántas compras respaldan la variación: con 2 o 3 datos hay que mirarla con cuidado.
+  # Cuántas compras respaldan la variación. Por debajo del mínimo se avisa en
+  # pantalla y la fila no entra en los números agregados (ver MIN_CONFIDENCE).
   def confidence_note(row)
     n = [row.baseline_n, row.recent_n].min
-    return "" if n.zero?
+    return "" if n.zero? || n >= IngredientPrices::MIN_CONFIDENCE
 
-    n < 3 ? tag.span("pocos datos", class: "tag tag--warn", title: "La variación se calcula con #{n} compra(s) en cada extremo") : ""
+    tag.span("pocos datos", class: "tag tag--warn",
+             title: "La variación se calcula con #{n} compra(s) en un extremo: no entra en la canasta ni en el impacto en pesos")
   end
 
   # "a mano" / "por regla" / "—": de dónde salió la categoría de un insumo.

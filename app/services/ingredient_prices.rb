@@ -22,7 +22,40 @@ class IngredientPrices
   PERIODS = { "3" => "3 meses", "6" => "6 meses", "12" => "12 meses", "24" => "2 años", "all" => "Todo" }.freeze
   STABLE_PCT     = 2.0 # variaciones de menos de ±2% se consideran precio estable
   OUTLIER_FACTOR = 4.0 # veces por encima o por debajo de la mediana para marcar sospechosa
-  WINDOW_DAYS    = 90  # ancho de las ventanas inicial y reciente que se comparan
+
+  # Ancho de las dos ventanas que se comparan. NO es fijo: se adapta al período.
+  #
+  # Con una ventana fija de 90 días, el período de "3 meses" (91 días) no daba
+  # ninguna variación: las dos ventanas se solapaban enteras, así que ningún
+  # insumo tenía contra qué compararse y la pantalla salía vacía.
+  #
+  # Ahora la ventana es un tercio del período —así siempre caben las dos, con
+  # un hueco en medio— con un techo de 90 días para que en períodos largos no
+  # se comparen trozos enormes, y un suelo de 21 para que no se compare ruido.
+  MAX_WINDOW_DAYS = 90
+  MIN_WINDOW_DAYS = 21
+
+  # Historial mínimo sobre el que se calcula el "precio normal" de un insumo, la
+  # mediana que decide qué compras son dudosas.
+  #
+  # Es a propósito INDEPENDIENTE del período elegido: con 3 o 6 meses hay pocas
+  # compras, la mediana se vuelve frágil y datos malos que en 12 meses se
+  # descartaban pasaban el corte. Pasó de verdad: una compra de mozzarella a
+  # $1.768/kg (gramos cargados como kilos) se colaba en el período de 6 meses y
+  # empujaba la canasta de +1,8% a +13,8%.
+  #
+  # Un insumo no puede cambiar de "precio normal" porque el usuario mueva un
+  # desplegable, así que el ancla mira siempre al menos un año.
+  ANCHOR_DAYS = 365
+
+  # Compras mínimas en CADA extremo para fiarse de una variación. Por debajo, la
+  # fila se marca "pocos datos" en pantalla y no entra en los números agregados
+  # (la canasta, el impacto en pesos, el ranking de los que más encarecieron).
+  #
+  # Si entra, un insumo con dos compras en un extremo puede mover el índice
+  # entero: la mozzarella, que es el 22% del gasto, llevaba la canasta de
+  # 6 meses a +13,8% apoyada en una sola compra dudosa.
+  MIN_CONFIDENCE = 3
 
   def self.median(values)
     return nil if values.empty?
@@ -56,6 +89,11 @@ class IngredientPrices
       return nil if baseline_price.nil? || change_pct.nil?
 
       spend - (quantity * baseline_price)
+    end
+
+    # ¿Hay bastantes compras en los dos extremos como para fiarse?
+    def reliable?
+      change_pct && [baseline_n, recent_n].min >= MIN_CONFIDENCE
     end
 
     def trend
@@ -99,16 +137,22 @@ class IngredientPrices
   def to_review = rows.select { |r| r.suspicious_count.positive? }.sort_by { |r| -r.suspicious_count }
 
   # Variación media ponderada por gasto: cuánto se movió "la canasta" del local.
-  # Pondera por gasto para que un insumo de $18M pese más que uno de $5.000.
+  # Pondera por gasto para que un insumo de $18M pese más que uno de $5.000, y
+  # solo suma comparaciones fiables (ver MIN_CONFIDENCE).
   def basket_change_pct
-    comparable = rows.select { |r| r.change_pct && r.spend.positive? }
+    comparable = reliable_rows.select { |r| r.spend.positive? }
     return nil if comparable.empty?
 
     weight = comparable.sum(&:spend)
     weight.zero? ? nil : comparable.sum { |r| r.change_pct * r.spend } / weight
   end
 
-  def spend_impact_total = rows.filter_map(&:spend_impact).sum
+  def reliable_rows = @reliable_rows ||= rows.select(&:reliable?)
+
+  # Cuántas filas quedaron fuera de los agregados por falta de datos.
+  def unreliable_count = rows.count { |r| r.change_pct && !r.reliable? }
+
+  def spend_impact_total = reliable_rows.filter_map(&:spend_impact).sum
 
   def rising  = rows.select { |r| r.trend == "alza" }
   def falling = rows.select { |r| r.trend == "baja" }
@@ -118,9 +162,10 @@ class IngredientPrices
   def top_spend(n = 5)   = rows.sort_by { |r| -r.spend }.first(n)
 
   # Los que más encarecieron la cuenta en pesos (alza x volumen comprado).
+  # Solo los fiables: este ranking se usa para decidir con quién negociar.
   def costliest_rises(n = 5)
-    rows.select { |r| (r.spend_impact || 0).positive? && r.trend == "alza" }
-        .sort_by { |r| -r.spend_impact }.first(n)
+    reliable_rows.select { |r| (r.spend_impact || 0).positive? && r.trend == "alza" }
+                 .sort_by { |r| -r.spend_impact }.first(n)
   end
 
   def sorted(key)
@@ -207,7 +252,14 @@ class IngredientPrices
   public
 
   def period_label = PERIODS[@period_key]
-  def window_days  = WINDOW_DAYS
+
+  # Un tercio del período, entre 21 y 90 días.
+  def window_days
+    @window_days ||= begin
+      tercio = ((@to - @from).to_i / 3.0).floor
+      tercio.clamp(MIN_WINDOW_DAYS, MAX_WINDOW_DAYS)
+    end
+  end
 
   private
 
@@ -224,8 +276,22 @@ class IngredientPrices
                       .filter_map { |id, list| build_row(id, list) }
   end
 
+  # Precio "normal" de cada insumo: la mediana de un historial amplio, no la del
+  # período elegido. Ver ANCHOR_DAYS.
+  def anchor_medians
+    @anchor_medians ||= begin
+      desde = [@from, @to - ANCHOR_DAYS].min
+      IngredientPurchase.between(desde, @to)
+                        .pluck(:fudo_ingredient_id, :unit_price)
+                        .group_by(&:first)
+                        .transform_values { |pares| self.class.median(pares.map { |(_, precio)| precio.to_f }) }
+    end
+  end
+
   def build_row(ingredient_id, list)
-    median = self.class.median(list.map { |p| p.unit_price.to_f })
+    # El ancla viene del historial amplio; si el insumo no tuviera nada ahí, se
+    # cae a la mediana del propio período.
+    median = anchor_medians[ingredient_id] || self.class.median(list.map { |p| p.unit_price.to_f })
     return nil if median.nil? || median.zero?
 
     clean, suspicious = list.partition { |p| plausible?(p.unit_price.to_f, median) }
@@ -237,7 +303,7 @@ class IngredientPrices
     last   = clean.last
 
     # Sin dos ventanas separadas no hay variación que medir (insumo nuevo o de compra única).
-    single_window = clean.first.purchased_on > last.purchased_on - WINDOW_DAYS
+    single_window = clean.first.purchased_on > last.purchased_on - window_days
     baseline = single_window ? [] : window_prices(clean, clean.first.purchased_on, :forward)
     recent   = window_prices(clean, last.purchased_on, :backward)
 
@@ -273,9 +339,9 @@ class IngredientPrices
     price <= median * OUTLIER_FACTOR && price >= median / OUTLIER_FACTOR
   end
 
-  # Precios de las compras dentro de los WINDOW_DAYS siguientes (o anteriores) a una fecha.
+  # Precios de las compras dentro de los `window_days` siguientes (o anteriores) a una fecha.
   def window_prices(clean, anchor, direction)
-    range = direction == :forward ? (anchor..anchor + WINDOW_DAYS) : (anchor - WINDOW_DAYS..anchor)
+    range = direction == :forward ? (anchor..anchor + window_days) : (anchor - window_days..anchor)
     clean.select { |p| range.cover?(p.purchased_on) }.map { |p| p.unit_price.to_f }
   end
 end

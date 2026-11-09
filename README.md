@@ -195,6 +195,29 @@ parámetro **no recorta solo atributos, también recorta las relaciones**. Sin p
 Por eso `Fudo::Client#ingredients` **no restringe campos**. Si alguna vez se optimiza esa
 llamada, comprobar que la categoría sigue llegando.
 
+#### Tres reglas que no son evidentes
+
+**La ventana se adapta al período.** Las variaciones comparan los primeros N días con
+los últimos N. N es un tercio del período, entre 21 y 90 días. Era fijo en 90, y eso
+dejaba el período de «3 meses» (91 días) completamente vacío: las dos ventanas se
+solapaban enteras y ningún insumo tenía con qué compararse.
+
+**El «precio normal» mira siempre un año** (`ANCHOR_DAYS`), no el período elegido. La
+mediana que decide qué compras son dudosas se calcula sobre el historial amplio, porque
+con 3 o 6 meses hay pocas compras y los datos malos se colaban: una mozzarella a
+$1.768/kg pasaba el filtro en el período de 6 meses y llevaba la canasta de +1,8% a
++13,8%. Un insumo no puede cambiar de precio normal porque alguien mueva un desplegable.
+
+**Los números agregados solo usan comparaciones fiables** (`MIN_CONFIDENCE`, 3 compras
+en cada extremo). La canasta, el impacto en pesos y el ranking de los que más
+encarecieron excluyen las filas marcadas «pocos datos»; las listas sí las muestran, con
+su etiqueta. Si no, un insumo con dos compras y el 22% del gasto mueve el índice entero.
+
+Ojo al tocar el filtro de dudosas: apretarlo de 4x a 3x parecía buena idea para atrapar
+esa mozzarella, pero también habría descartado seis compras seguidas de burrata a
+$23.840, que es un precio real. El filtro distingue mal entre un error de carga y un
+cambio de precio brusco; por eso la defensa está en las otras dos reglas.
+
 #### Asignación del tipo de insumo
 
 `IngredientClassifier` clasifica por palabras clave del nombre: asigna solo 167 de 170
