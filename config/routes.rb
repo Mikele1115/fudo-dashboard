@@ -11,6 +11,7 @@ Rails.application.routes.draw do
   post  "insumos/categorias/reclasificar", to: "ingredient_categories#reclassify", as: :reclassify_ingredient_categories
   get   "insumos/categorias/:id", to: "ingredient_categories#show", as: :ingredient_category, constraints: { id: /[0-9]+/ }
   get   "insumos/fudo/:name", to: "ingredient_categories#fudo_show", as: :fudo_category
+  get  "insumos/revisar", to: "ingredients#review", as: :review_ingredients
   get  "insumos/:id", to: "ingredients#show", as: :ingredient, constraints: { id: /[0-9]+/ }
   post "insumos/actualizar", to: "ingredients#sync", as: :sync_ingredients
   post "alertas/:id/vista", to: "price_alerts#acknowledge", as: :acknowledge_alert, constraints: { id: /[0-9]+/ }

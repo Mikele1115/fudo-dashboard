@@ -20,6 +20,10 @@
         <% end %>
       </select>
     </form>
+    <%= link_to review_ingredients_path, class: "btn btn--ghost",
+                title: "Compras donde el monto cuadra pero la cantidad cargada no" do %>
+      Revisar cargas<% if @typos.to_i.positive? %> (<%= int(@typos) %>)<% end %>
+    <% end %>
     <%= button_to "Actualizar compras", sync_ingredients_path, params: { period: a.period_key },
                   class: "btn btn--light", form_class: "inline" %>
   </div>

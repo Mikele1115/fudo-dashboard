@@ -234,6 +234,39 @@ esa mozzarella, pero también habría descartado seis compras seguidas de burrat
 $23.840, que es un precio real. El filtro distingue mal entre un error de carga y un
 cambio de precio brusco; por eso la defensa está en las otras dos reglas.
 
+#### Revisar cargas: cuando la plata cuadra y la cantidad no
+
+`QuantityTypos` busca un error que el filtro de dudosas no puede ver. Ese filtro descarta
+precios más de 4 veces fuera de la mediana, y los errores de cantidad no siempre llegan a
+tanto: 0,2 kg de menta cargados como 0,5 por el mismo monto dejan el precio unitario en la
+mitad, lo bastante raro para ensuciar las estadísticas y lo bastante normal para pasar.
+Apretar el filtro ya se midió y no sirve (descartaría compras reales de burrata).
+
+Así que esto no mira el precio, mira el **monto**. Una línea se marca cuando:
+
+1. su precio unitario se aleja más del 40% del habitual del insumo (la mediana de todo su
+   historial), **y**
+2. su monto coincide al 0,5% con el de otra compra hecha al precio normal, **y**
+3. esa otra compra es de una cantidad que el insumo compra de verdad (vista 2+ veces), **y**
+4. la cantidad cargada no es esa.
+
+Si la plata que salió es la misma y la cantidad no, lo que falla es la cantidad — y la
+compra gemela dice cuál era. De ahí sale la columna «cantidad correcta».
+
+Los umbrales se midieron contra las 2.877 líneas reales, no se eligieron a ojo: con un
+desvío del 10% salían 180 líneas, casi todas fiambres y quesos que de verdad varían de
+precio entre compras. Con 40% quedan 90, en 27 insumos, y 85 tienen un factor limpio
+(x2, x10, x1000, x30), que es la huella de un error de tipeo o de unidad. Las otras 5 se
+marcan «confirmar» en vez de «casi seguro».
+
+La pantalla **no corrige nada** y no cambia ningún cálculo: las líneas siguen contando
+igual, para que el error siga saltando hasta que se arregle en Fudo, que es donde está el
+dato. Es la misma regla de siempre: señalar, nunca tocar el origen.
+
+Un hallazgo del detector: la burrata a $23.840 que quedó pendiente de confirmar no era un
+cambio de formato ni una subida real. $23.840 son exactamente 4 burratas a $5.960, y la
+línea dice cantidad 1.
+
 #### Asignación del tipo de insumo
 
 `IngredientClassifier` clasifica por palabras clave del nombre: asigna solo 167 de 170

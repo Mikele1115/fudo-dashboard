@@ -1,0 +1,151 @@
+<%# Líneas donde el monto cuadra y la cantidad no. La corrección se hace en Fudo. %>
+<% cant = ->(n) { number_with_precision(n, precision: 3, strip_insignificant_zeros: true, separator: ",", delimiter: ".") } %>
+
+<section class="page-head">
+  <div>
+    <h1>Revisar cargas</h1>
+    <p class="muted">
+      Compras donde el monto coincide con el de otra compra del mismo insumo,
+      pero la cantidad cargada es otra. El dinero que salió del local está bien;
+      lo que está mal es la cantidad, y con ella el precio por <%= "kilo/litro/unidad" %>.
+    </p>
+  </div>
+  <div class="datepicker">
+    <form method="get" action="<%= review_ingredients_path %>" class="inline">
+      <select name="period" onchange="this.form.requestSubmit()">
+        <% IngredientPrices::PERIODS.each do |key, label| %>
+          <option value="<%= key %>" <%= "selected" if key == @period_key %>><%= label %></option>
+        <% end %>
+      </select>
+    </form>
+    <%= link_to "‹ Volver a insumos", ingredients_path, class: "btn btn--ghost" %>
+  </div>
+</section>
+
+<% if @findings.empty? %>
+  <section class="card">
+    <h2>Nada que revisar en este período</h2>
+    <p class="muted">
+      No hay líneas donde el monto cuadre con una compra normal y la cantidad no.
+      Prueba con un período más largo: en todo el historial hay <%= int(@all.size) %>.
+    </p>
+  </section>
+<% else %>
+
+<section class="kpis kpis--4">
+  <div class="kpi">
+    <div class="kpi__label">Líneas marcadas</div>
+    <div class="kpi__value txt--bad"><%= int(@findings.size) %></div>
+    <div class="kpi__delta muted">de <%= int(@all.size) %> en todo el historial</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi__label">Insumos afectados</div>
+    <div class="kpi__value"><%= int(@findings.map(&:ingredient_id).uniq.size) %></div>
+    <div class="kpi__delta muted">con al menos una línea mal cargada</div>
+  </div>
+  <div class="kpi">
+    <% altas = @findings.count { |f| f.confidence == :alta } %>
+    <div class="kpi__label">Casi seguras</div>
+    <div class="kpi__value"><%= int(altas) %></div>
+    <div class="kpi__delta muted"><%= int(@findings.size - altas) %> a confirmar</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi__label">Dinero involucrado</div>
+    <div class="kpi__value"><%= money(@findings.sum(&:amount)) %></div>
+    <div class="kpi__delta muted">el monto no cambia al corregir</div>
+  </div>
+</section>
+
+<section class="card">
+  <h2>Cómo se detecta</h2>
+  <p class="muted small">
+    Para cada insumo se toma su precio habitual (la mediana de todo su historial, que no
+    se mueve por un dato suelto). Una línea se marca cuando su precio por unidad se aleja
+    más del <%= (QuantityTypos::PRICE_TOL * 100).round %>% de ese habitual
+    <strong>y</strong> su monto coincide, al <%= (QuantityTypos::MONEY_TOL * 100).round(1).to_s.sub(".0", "") %>%,
+    con el de otra compra hecha al precio normal en una cantidad que el insumo compra de
+    verdad. Si la plata es la misma y la cantidad no, lo que falla es la cantidad —
+    y esa otra compra dice cuál era la correcta.
+  </p>
+  <p class="muted small">
+    Esto <strong>no corrige nada</strong> ni cambia los cálculos: las líneas siguen
+    contando igual que hasta ahora, para que el error siga saltando hasta que se arregle
+    en Fudo. Las compras con el precio directamente fuera de rango se siguen listando
+    abajo del todo en <%= link_to "Insumos", ingredients_path %>, que es otro problema:
+    allí no se sabe cuál era la cantidad buena.
+  </p>
+</section>
+
+<% por_insumo = @findings.group_by(&:ingredient_id).values.sort_by { |g| -g.size } %>
+<% if por_insumo.size > 1 %>
+  <section class="card">
+    <h2>Por insumo</h2>
+    <p class="muted small">
+      Cuando el mismo insumo repite el error, casi siempre es una costumbre de carga
+      (el formato del proveedor cargado como «1») y conviene arreglar el criterio, no
+      solo las líneas.
+    </p>
+    <table class="table">
+      <thead>
+        <tr><th>Insumo</th><th>Líneas</th><th>Precio habitual</th><th>Patrón</th><th>Última</th></tr>
+      </thead>
+      <tbody>
+        <% por_insumo.each do |grupo| %>
+          <% f = grupo.first %>
+          <tr>
+            <td><%= link_to f.name, ingredient_path(f.ingredient_id) %>
+                <span class="muted small">/ <%= f.unit %></span></td>
+            <td><strong><%= int(grupo.size) %></strong></td>
+            <td><%= money(f.normal_price) %></td>
+            <td class="muted">
+              <% factores = grupo.filter_map(&:factor).map { |x| x.round(4) }.tally.max_by { |_, n| n } %>
+              <% if factores %>
+                cantidad <%= factores[0] > 1 ? "x#{cant.(factores[0])} de más" : "x#{cant.((1 / factores[0]))} de menos" %>
+              <% end %>
+            </td>
+            <td class="muted"><%= f.on.strftime("%d/%m/%Y") %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </section>
+<% end %>
+
+<section class="card">
+  <h2>Líneas a corregir en Fudo</h2>
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Fecha</th><th>Insumo</th><th>Proveedor</th>
+        <th>Cargado</th><th>Monto</th><th>Cantidad correcta</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @findings.each do |f| %>
+        <tr>
+          <td class="muted"><%= f.on.strftime("%d/%m/%Y") %></td>
+          <td><%= link_to f.name, ingredient_path(f.ingredient_id) %></td>
+          <td class="muted small"><%= f.provider.presence || "—" %></td>
+          <td>
+            <strong><%= cant.(f.loaded_quantity) %></strong> <%= f.unit %>
+            <span class="muted small">a <%= money(f.loaded_price) %></span>
+          </td>
+          <td><%= money(f.amount) %></td>
+          <td>
+            <strong class="txt--good"><%= cant.(f.suggested_quantity) %></strong> <%= f.unit %>
+            <span class="muted small">a <%= money(f.normal_price) %>,
+              como el <%= f.twin_on.strftime("%d/%m/%Y") %></span>
+          </td>
+          <td>
+            <% if f.confidence == :alta %>
+              <span class="tag tag--warn" title="La cantidad cargada es exactamente <%= cant.(f.factor && f.factor > 1 ? f.factor : (f.factor ? 1 / f.factor : 0)) %> veces la correcta: huella de un error de tipeo o de unidad">casi seguro</span>
+            <% else %>
+              <span class="tag" title="El monto cuadra, pero la proporción entre cantidades no es limpia: podría ser un cambio de formato o de precio real">confirmar</span>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</section>
+<% end %>
