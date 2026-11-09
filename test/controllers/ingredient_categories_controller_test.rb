@@ -34,6 +34,26 @@ class IngredientCategoriesControllerTest < ActionDispatch::IntegrationTest
     assert_match "+28,6%", response.body # 7.000 -> 9.000 por kg
   end
 
+  test "los KPIs de la categoría ignoran las comparaciones de pocos datos" do
+    # La mozzarella tiene una sola compra en cada extremo. La tabla de subidas
+    # la sigue mostrando (con su etiqueta), pero no puede mover los totales de
+    # arriba: antes sí los movía, y la misma categoría daba un número distinto
+    # según se mirara desde aquí o desde el panel principal.
+    get ingredient_category_path(@quesos, period: "all")
+    assert_response :success
+
+    etiquetas = css_select(".kpi__label").map { |n| n.text.strip }
+    valores   = css_select(".kpi__value").map { |n| n.text.strip }
+
+    assert_equal "Variación de precios", etiquetas[1]
+    assert_equal "—", valores[1], "sin comparaciones fiables no hay variación que mostrar"
+    assert_equal "Costó de más", etiquetas[5]
+    assert_equal "0", valores[5].gsub(/[^0-9]/, ""), "ni impacto en pesos"
+
+    assert_match "fuera por pocos datos", response.body
+    assert_match "Subidas de precio", response.body, "la fila sigue listada abajo"
+  end
+
   test "una categoría sin compras en el período no rompe la página" do
     vacia = IngredientCategory.find_by(name: "Limpieza")
     get ingredient_category_path(vacia)

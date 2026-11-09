@@ -213,6 +213,22 @@ en cada extremo). La canasta, el impacto en pesos y el ranking de los que más
 encarecieron excluyen las filas marcadas «pocos datos»; las listas sí las muestran, con
 su etiqueta. Si no, un insumo con dos compras y el 22% del gasto mueve el índice entero.
 
+Esto vale **también por categoría** (`build_groups`), y durante un tiempo no fue así: los
+totales de la página de una categoría sumaban todas las filas, mientras el panel principal
+sumaba solo las fiables, así que el mismo grupo daba dos números distintos según desde
+dónde se mirara. En Ingredientes Barra a 3 meses salía +0,35% con un «ahorro» de $40.166,
+de los que $10.321 eran un licor comparado con una compra contra una. Con el criterio
+correcto: +0,98% y $26.444. La prueba que lo fija es que la suma de los impactos por
+categoría tiene que dar exactamente el impacto del panel.
+
+Y ojo con leer el «ahorro» como plata ahorrada. La variación mira los dos extremos del
+período; el impacto en pesos compara **todo lo gastado** contra lo que habría costado esa
+misma cantidad al precio inicial, así que incluye el medio del período. Un insumo puede
+estar a 0,0% y aun así mostrar ahorro. Y buena parte de ese ahorro suele ser carga mala:
+menta cargada como 0,5 kg cuando eran 0,2 por el mismo monto baja el precio unitario a la
+mitad sin que nadie pagara menos, y $8.672 contra una mediana de $21.680 no lo atrapa el
+filtro de 4x.
+
 Ojo al tocar el filtro de dudosas: apretarlo de 4x a 3x parecía buena idea para atrapar
 esa mozzarella, pero también habría descartado seis compras seguidas de burrata a
 $23.840, que es un precio real. El filtro distingue mal entre un error de carga y un

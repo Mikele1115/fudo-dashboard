@@ -192,7 +192,8 @@ class IngredientPrices
   # de dos categorías de Fudo si sus insumos están repartidos. Se agrupa por
   # insumo, no por un árbol predefinido.
 
-  Group = Struct.new(:key, :name, :rows, :spend, :share, :change_pct, keyword_init: true) do
+  Group = Struct.new(:key, :name, :rows, :spend, :share, :change_pct,
+                     :spend_impact, :reliable_count, :unreliable_count, keyword_init: true) do
     def ingredients_count = rows.size
     def sin_categoria?    = key.nil?
   end
@@ -236,15 +237,26 @@ class IngredientPrices
       gasto = grupo.sum(&:spend)
       # La variación del grupo se pondera por gasto, igual que la canasta:
       # un insumo de $18M debe pesar más que uno de $5.000.
-      comparables = grupo.select { |r| r.change_pct && r.spend.positive? }
-      peso = comparables.sum(&:spend)
+      #
+      # Y, también igual que la canasta, solo entran las comparaciones FIABLES
+      # (ver MIN_CONFIDENCE). Antes entraban todas, así que la misma categoría
+      # daba un número distinto según la pantalla desde la que se mirara, y lo
+      # peor: un insumo con una sola compra en cada extremo movía el total.
+      # Pasó con Ingredientes Barra en 3 meses: salía +0,35% y un "ahorro" de
+      # $40.166 del que $10.321 eran un licor comparado con 1 compra contra 1.
+      # Con solo fiables: +0,98% y $26.444.
+      fiables = grupo.select { |r| r.reliable? && r.spend.positive? }
+      peso    = fiables.sum(&:spend)
       Group.new(
-        key:        clave,
-        name:       clave.is_a?(IngredientCategory) ? clave.name : (clave || "Sin subcategoría"),
-        rows:       grupo,
-        spend:      gasto,
-        share:      total.positive? ? gasto / total * 100.0 : 0.0,
-        change_pct: peso.zero? ? nil : comparables.sum { |r| r.change_pct * r.spend } / peso
+        key:              clave,
+        name:             clave.is_a?(IngredientCategory) ? clave.name : (clave || "Sin subcategoría"),
+        rows:             grupo,
+        spend:            gasto,
+        share:            total.positive? ? gasto / total * 100.0 : 0.0,
+        change_pct:       peso.zero? ? nil : fiables.sum { |r| r.change_pct * r.spend } / peso,
+        spend_impact:     fiables.filter_map(&:spend_impact).sum,
+        reliable_count:   fiables.size,
+        unreliable_count: grupo.count { |r| r.change_pct && !r.reliable? }
       )
     end
   end

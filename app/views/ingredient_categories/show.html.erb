@@ -44,7 +44,14 @@
     <div class="kpi__value <%= g.change_pct && g.change_pct.positive? ? 'txt--bad' : 'txt--good' %>">
       <%= g.change_pct ? pct_text(100 + g.change_pct, 100) : "—" %>
     </div>
-    <div class="kpi__delta muted">ponderada por gasto</div>
+    <div class="kpi__delta muted">
+      ponderada por gasto, sobre <%= int(g.reliable_count) %> insumo<%= "s" if g.reliable_count != 1 %>
+      <% if g.unreliable_count.positive? %>
+        <span title="Quedan fuera las variaciones con menos de <%= IngredientPrices::MIN_CONFIDENCE %> compras en algún extremo: un insumo con dos compras no debe mover el número de toda la categoría">
+          (<%= int(g.unreliable_count) %> fuera por pocos datos)
+        </span>
+      <% end %>
+    </div>
   </div>
   <div class="kpi">
     <div class="kpi__label">Subieron</div>
@@ -62,10 +69,12 @@
     <div class="kpi__delta muted">saltos de precio avisados</div>
   </div>
   <div class="kpi">
-    <% impacto = @rows.filter_map(&:spend_impact).sum %>
+    <%# Mismo criterio que la variación de arriba y que el panel principal:
+        solo filas fiables. El cálculo vive en IngredientPrices#build_groups. %>
+    <% impacto = g.spend_impact %>
     <div class="kpi__label"><%= impacto.negative? ? "Ahorro" : "Costó de más" %></div>
     <div class="kpi__value <%= impacto.negative? ? 'txt--good' : 'txt--bad' %>"><%= money(impacto.abs) %></div>
-    <div class="kpi__delta muted">por el movimiento de precios</div>
+    <div class="kpi__delta muted">por el movimiento de precios, solo insumos fiables</div>
   </div>
 </section>
 
@@ -140,7 +149,7 @@
       <tr><th>Insumo</th><th>Antes</th><th>Ahora</th><th>Variación</th><th>Ahorro</th></tr>
       <% bajan.each do |r| %>
         <tr>
-          <td><%= link_to r.name, ingredient_path(r.ingredient_id, period: a.period_key) %></td>
+          <td><%= link_to r.name, ingredient_path(r.ingredient_id, period: a.period_key) %> <%= confidence_note(r) %></td>
           <td><%= money(r.baseline_price) %></td>
           <td><strong><%= money(r.recent_price) %></strong></td>
           <td><%= price_change_badge(r.recent_price, r.baseline_price) %></td>

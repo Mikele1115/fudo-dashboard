@@ -90,4 +90,35 @@ class IngredientPricesTest < ActiveSupport::TestCase
     assert_equal 20, IngredientPrices.median([10, 20, 30])
     assert_nil IngredientPrices.median([])
   end
+
+  test "los grupos usan el mismo criterio de fiabilidad que el panel principal" do
+    # Un insumo fiable que no se movió (3 compras en cada extremo) y uno con una
+    # sola compra en cada extremo que aparenta un desplome del 50%.
+    3.times { |i| buy(name: "Harina", on: TODAY - 360 + i, qty: 1, unit_total: 1000) }
+    3.times { |i| buy(name: "Harina", on: TODAY - 10 + i, qty: 1, unit_total: 1000) }
+    buy(name: "Licor", on: TODAY - 360, qty: 1, unit_total: 10_000, ingredient_id: 2)
+    buy(name: "Licor", on: TODAY - 10,  qty: 1, unit_total: 5_000,  ingredient_id: 2)
+
+    a     = IngredientPrices.new(period: "12", to: TODAY)
+    grupo = a.grouped_by_fudo_category.first
+
+    assert_equal 2, grupo.rows.size
+    assert_equal 1, grupo.reliable_count
+    assert_equal 1, grupo.unreliable_count
+
+    # Sin el filtro, el licor —1 compra contra 1— arrastraba el grupo a -35,7%
+    # y le inventaba $5.000 de ahorro.
+    assert_in_delta 0.0, grupo.change_pct, 0.01, "el licor no debe mover la variación del grupo"
+    assert_equal 0, grupo.spend_impact, "ni inventar un ahorro"
+  end
+
+  test "la suma de los impactos por categoría cuadra con el total del panel" do
+    3.times { |i| buy(name: "Harina", on: TODAY - 360 + i, qty: 1, unit_total: 1000) }
+    3.times { |i| buy(name: "Harina", on: TODAY - 10 + i, qty: 1, unit_total: 1200) }
+    3.times { |i| buy(name: "Menta", on: TODAY - 360 + i, qty: 1, unit_total: 20_000, ingredient_id: 2) }
+    3.times { |i| buy(name: "Menta", on: TODAY - 10 + i, qty: 1, unit_total: 18_000, ingredient_id: 2) }
+
+    a = IngredientPrices.new(period: "12", to: TODAY)
+    assert_equal a.spend_impact_total, a.grouped_by_fudo_category.sum(&:spend_impact)
+  end
 end
