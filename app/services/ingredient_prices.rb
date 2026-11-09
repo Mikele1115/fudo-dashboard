@@ -84,11 +84,35 @@ class IngredientPrices
       (recent_price - baseline_price) / baseline_price * 100.0
     end
 
-    # Cuánto costó de más (o de menos) el movimiento de precios, sobre lo comprado.
+    # Lo que pesa el movimiento de precios: comprando el mismo volumen, cuánto
+    # más (o menos) se paga al precio de ahora que al del arranque del período.
+    #
+    # Era `spend - quantity * baseline_price`: lo realmente gastado contra lo que
+    # habría costado todo al precio inicial. Suena parecido y no lo es, porque
+    # mezcla dos estadísticas: `spend` lleva dentro el PROMEDIO pagado, y
+    # `baseline_price` es una MEDIANA. El promedio sí absorbe las líneas sueltas
+    # que la mediana está puesta a ignorar, así que aparecían ahorros de miles de
+    # pesos en insumos que no se habían movido ni un peso:
+    #
+    #   Agua (Bidón): once compras a $2.800 y una a $1.750 dentro de la ventana
+    #   inicial. Variación 0,0%, "ahorro" $4.200, que son solo esa línea.
+    #   Menta: "ahorro" $9.550, que es una cantidad mal cargada (ver QuantityTypos).
+    #
+    # Doce de los catorce insumos fiables de Ingredientes Barra aportaban ahorro
+    # sin haber cambiado de precio, y el número contradecía a la variación que
+    # tenía al lado.
+    #
+    # Ahora usa las MISMAS dos medianas que change_pct. Un insumo que terminó al
+    # precio que empezó da exactamente $0, y el signo no puede contradecir a la
+    # variación porque es el mismo resto.
+    #
+    # Ojo al leerlo: es un "si compraras lo mismo al precio de ahora", no la plata
+    # que salió de la caja. En períodos largos el volumen es grande y el número
+    # también; por eso las pantallas lo dicen al lado.
     def spend_impact
-      return nil if baseline_price.nil? || change_pct.nil?
+      return nil if baseline_price.nil? || recent_price.nil? || change_pct.nil?
 
-      spend - (quantity * baseline_price)
+      quantity * (recent_price - baseline_price)
     end
 
     # ¿Hay bastantes compras en los dos extremos como para fiarse?

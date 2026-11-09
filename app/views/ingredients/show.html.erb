@@ -43,7 +43,10 @@
     <div class="kpi__value"><%= money(r.spend) %></div>
     <div class="kpi__delta">
       <% if r.spend_impact %>
-        <span class="muted"><%= r.spend_impact.positive? ? "costó" : "ahorró" %> <%= money(r.spend_impact.abs) %> por el cambio de precio</span>
+        <span class="muted">
+          al precio de ahora, ese volumen cuesta
+          <%= money(r.spend_impact.abs) %> <%= r.spend_impact.negative? ? "menos" : "más" %>
+        </span>
       <% end %>
     </div>
   </div>

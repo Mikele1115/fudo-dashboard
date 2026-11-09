@@ -69,13 +69,42 @@ class IngredientPricesTest < ActiveSupport::TestCase
   end
 
   test "el impacto en pesos mide la subida sobre el volumen comprado" do
-    # 10 kg a 1.000 al principio, 10 kg a 1.200 despues: se gastaron 2.000 de mas.
+    # 20 kg en total y el precio pasó de 1.000 a 1.200: comprar esos mismos
+    # 20 kg al precio de ahora cuesta 4.000 más. No es la plata que salió de la
+    # caja (fueron 2.000), es lo que pesa el cambio de precio sobre ese volumen.
     buy(name: "Queso", on: TODAY - 360, qty: 10, unit_total: 10_000)
     buy(name: "Queso", on: TODAY - 10,  qty: 10, unit_total: 12_000)
 
     row = IngredientPrices.new(period: "12", to: TODAY).rows.first
     assert_equal 22_000, row.spend
-    assert_in_delta 2_000, row.spend_impact, 0.01
+    assert_in_delta 4_000, row.spend_impact, 0.01
+  end
+
+  test "un insumo que termina al precio que empezó no inventa ahorro" do
+    # El caso del agua en bidón: once compras al precio de siempre y una suelta
+    # más barata dentro de la ventana inicial. La mediana la ignora, como debe;
+    # el impacto en pesos tiene que ignorarla igual, o aparece un ahorro que
+    # nunca fue un movimiento de precio.
+    3.times { |i| buy(name: "Agua", on: TODAY - 360 + i, qty: 5, unit_total: 14_000) }
+    buy(name: "Agua", on: TODAY - 357, qty: 4, unit_total: 7_000) # suelta, a mitad de precio
+    4.times { |i| buy(name: "Agua", on: TODAY - 10 + i, qty: 5, unit_total: 14_000) }
+
+    row = IngredientPrices.new(period: "12", to: TODAY).rows.first
+    assert_in_delta 0.0, row.change_pct, 0.01
+    assert_in_delta 0.0, row.spend_impact, 0.01, "sin cambio de precio no hay impacto"
+  end
+
+  test "el signo del impacto nunca contradice a la variación" do
+    3.times { |i| buy(name: "Harina", on: TODAY - 360 + i, qty: 1, unit_total: 1000) }
+    3.times { |i| buy(name: "Harina", on: TODAY - 10 + i, qty: 1, unit_total: 1200) }
+    3.times { |i| buy(name: "Menta", on: TODAY - 360 + i, qty: 1, unit_total: 20_000, ingredient_id: 2) }
+    3.times { |i| buy(name: "Menta", on: TODAY - 10 + i, qty: 1, unit_total: 18_000, ingredient_id: 2) }
+
+    IngredientPrices.new(period: "12", to: TODAY).rows.each do |r|
+      next if r.spend_impact.nil? || r.spend_impact.zero?
+
+      assert_equal r.change_pct.positive?, r.spend_impact.positive?, "#{r.name} se contradice"
+    end
   end
 
   test "las variaciones de menos de 2% se consideran precio estable" do

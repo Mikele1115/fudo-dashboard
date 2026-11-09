@@ -221,18 +221,37 @@ de los que $10.321 eran un licor comparado con una compra contra una. Con el cri
 correcto: +0,98% y $26.444. La prueba que lo fija es que la suma de los impactos por
 categoría tiene que dar exactamente el impacto del panel.
 
-Y ojo con leer el «ahorro» como plata ahorrada. La variación mira los dos extremos del
-período; el impacto en pesos compara **todo lo gastado** contra lo que habría costado esa
-misma cantidad al precio inicial, así que incluye el medio del período. Un insumo puede
-estar a 0,0% y aun así mostrar ahorro. Y buena parte de ese ahorro suele ser carga mala:
-menta cargada como 0,5 kg cuando eran 0,2 por el mismo monto baja el precio unitario a la
-mitad sin que nadie pagara menos, y $8.672 contra una mediana de $21.680 no lo atrapa el
-filtro de 4x.
+**El impacto en pesos usa las mismas dos medianas que la variación.** Es
+`cantidad x (precio de ahora - precio del arranque)`: comprando el mismo volumen, cuánto
+más se paga al precio nuevo. Se lee como un «si compraras lo mismo hoy», no como plata que
+salió de la caja, y las pantallas lo dicen al lado del número.
 
-Ojo al tocar el filtro de dudosas: apretarlo de 4x a 3x parecía buena idea para atrapar
-esa mozzarella, pero también habría descartado seis compras seguidas de burrata a
-$23.840, que es un precio real. El filtro distingue mal entre un error de carga y un
-cambio de precio brusco; por eso la defensa está en las otras dos reglas.
+Antes era `lo gastado - cantidad x precio inicial`, que suena parecido y no lo es: mezcla
+el PROMEDIO pagado (dentro de `spend`) con una MEDIANA de referencia. El promedio sí
+absorbe las líneas sueltas que la mediana está puesta a ignorar, así que salían ahorros en
+insumos que no se habían movido de precio. El agua en bidón: once compras a $2.800 y una a
+$1.750 dentro de la ventana inicial, variación 0,0%, «ahorro» $4.200 que eran solo esa
+línea. En Ingredientes Barra a 3 meses, doce de los catorce insumos fiables aportaban
+ahorro con 0,0% de variación, y el total contradecía al porcentaje que tenía al lado:
++1,0% y $28.194 de ahorro a la vez.
+
+Con la fórmula actual el signo del impacto es el de la variación por construcción, y un
+insumo que termina al precio que empezó da exactamente $0. Hay una prueba que lo fija.
+La contrapartida es que en períodos largos el volumen es grande y el número también
+($5,7 millones a 2 años): es correcto para lo que mide, pero hay que etiquetarlo bien.
+
+Probé una tercera versión —mediana del período contra mediana inicial— y la descarté:
+arreglaba los 3 meses y rompía los 12. No se cambia una métrica cuyo comportamiento no se
+entiende en todos los períodos.
+
+Ojo al tocar el filtro de dudosas. Durante un tiempo aquí decía que apretarlo de 4x a 3x
+habría descartado seis compras seguidas de burrata a $23.840 «que es un precio real».
+**Era falso**, y lo descubrió `QuantityTypos`: $23.840 son exactamente cuatro burratas a
+$5.960 con la cantidad cargada como 1. Lo que queda en pie no es aquel argumento sino el
+de fondo: el filtro de precio no distingue un error de carga de un cambio de precio brusco,
+porque solo mira el precio. El que sí distingue es el que mira el monto. Si alguien quiere
+apretar el filtro, que lo vuelva a medir contra los datos; el ejemplo que lo desaconsejaba
+ya no vale.
 
 #### Revisar cargas: cuando la plata cuadra y la cantidad no
 

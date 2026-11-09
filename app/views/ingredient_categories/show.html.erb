@@ -74,7 +74,10 @@
     <% impacto = g.spend_impact %>
     <div class="kpi__label"><%= impacto.negative? ? "Ahorro" : "Costó de más" %></div>
     <div class="kpi__value <%= impacto.negative? ? 'txt--good' : 'txt--bad' %>"><%= money(impacto.abs) %></div>
-    <div class="kpi__delta muted">por el movimiento de precios, solo insumos fiables</div>
+    <div class="kpi__delta muted">
+      comprando el mismo volumen al precio de ahora en vez del del arranque.
+      Solo insumos fiables.
+    </div>
   </div>
 </section>
 
@@ -109,7 +112,7 @@
     <h2>⚠ Subidas de precio</h2>
     <p class="muted small">
       Comparando la mediana de las primeras compras del período con la de las últimas.
-      Ordenado por cuánto costó de más, que es lo que de verdad pesa.
+      Ordenado por cuánto pesa la subida sobre el volumen comprado, no por el porcentaje.
     </p>
     <table class="table">
       <thead>
@@ -125,15 +128,10 @@
             <td><%= price_change_badge(r.recent_price, r.baseline_price) %></td>
             <td class="muted"><%= number_with_precision(r.quantity, precision: 1, delimiter: ".", separator: ",") %> <%= r.unit_label %></td>
             <td>
-              <%# El impacto puede salir negativo aunque el precio haya subido: pasa
-                  cuando el grueso de lo comprado se pagó por debajo del precio
-                  inicial y la subida es reciente. Poner un número negativo bajo
-                  "costó de más" confunde, así que se marca aparte. %>
-              <% if r.spend_impact && r.spend_impact.negative? %>
-                <span class="muted" title="El precio subió al final del período, pero el promedio pagado quedó por debajo del inicial: todavía no ha costado dinero">aún no</span>
-              <% else %>
-                <strong><%= money(r.spend_impact) %></strong>
-              <% end %>
+              <%# Ya no hace falta el caso "subió el precio pero el impacto sale
+                  negativo": con la fórmula actual el signo del impacto es el de la
+                  variación por construcción. Ver IngredientPrices::Row#spend_impact. %>
+              <strong><%= money(r.spend_impact) %></strong>
             </td>
           </tr>
         <% end %>
