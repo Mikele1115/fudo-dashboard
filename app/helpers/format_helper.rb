@@ -99,6 +99,26 @@ module FormatHelper
     end
   end
 
+  # Aviso de que las dos ventanas que se comparan no tienen los mismos días de la semana.
+  # nil cuando cuadran o cuando el desajuste es demasiado chico para cambiar la lectura.
+  #   "Un sábado menos y un martes más que el año anterior: el calendario le resta unos
+  #    $1.050.000 a este período, así que la variación se queda corta."
+  def weekday_gap_note(period)
+    gap = period.weekday_gap
+    return nil unless gap&.material?
+
+    verbo   = gap.favourable? ? "suma" : "resta"
+    lectura = gap.favourable? ? "la variación se ve mejor de lo que fue" : "la variación se queda corta"
+    "#{gap.text.capitalize} que el año anterior: el calendario le #{verbo} unos " \
+      "#{money(gap.effect.abs)} a este período, así que #{lectura}."
+  end
+
+  # Versión corta para la tarjeta del KPI, donde no hay ancho: "un sábado menos y un martes más".
+  def weekday_gap_short(period)
+    gap = period.weekday_gap
+    gap&.material? ? "#{gap.text} que el año anterior" : nil
+  end
+
   def cutoff_note
     cutoff = AppSettings.cutoff_hour
     return "" if cutoff.zero?

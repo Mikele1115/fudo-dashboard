@@ -14,6 +14,12 @@ en un dashboard con todos los indicadores, y envía un informe por correo todos 
 - Comparación con el año anterior: mismo día de la semana (`COMPARE_MODE=weekday`, D − 364 días)
   o misma fecha (`COMPARE_MODE=date`).
 - Acumulados: semana en curso, mes en curso y año en curso contra el mismo período del año anterior.
+  La semana se compara por día de la semana (D − 364), pero el mes y el año se comparan por calendario,
+  y esas dos ventanas no siempre traen los mismos días: del 1 al 10 de noviembre de 2026 hay un sábado
+  y dos martes, y en 2025 había dos sábados y un martes. Como un sábado vende casi el doble que un
+  martes, parte de la variación es calendario y no crecimiento. `Metrics::WeekdayGap` lo mide —
+  valora cada día que falta o sobra al promedio de ese día de la semana en el año en curso — y el panel
+  lo avisa cuando mueve el período más de `MATERIAL_GAP_PCT` (2%); en ventanas largas se diluye y calla.
 - Venta promedio diaria: año en curso, año anterior mismo período, año anterior completo, y
   cuánto se desvía el día de cada promedio.
 - Mismo día de la semana: promedio de todos los lunes (o el día que corresponda) del año en curso

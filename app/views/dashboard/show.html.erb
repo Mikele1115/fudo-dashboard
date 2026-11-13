@@ -56,6 +56,9 @@
     <div class="kpi__label">Mes en curso</div>
     <div class="kpi__value"><%= money(mtd.current.total) %></div>
     <div class="kpi__delta"><%= pct_badge(mtd.current.total, mtd.ly.total) %> <span class="muted">vs. mismo período <%= m.report_date.year - 1 %></span></div>
+    <% if (aviso = weekday_gap_short(mtd)) %>
+      <div class="kpi__warn" title="<%= weekday_gap_note(mtd) %>">⚠ <%= aviso %></div>
+    <% end %>
   </div>
 </section>
 
@@ -86,7 +89,12 @@
       <tbody>
         <% m.periods.each do |p| %>
           <tr>
-            <td><%= p.label %><br><span class="muted small"><%= p.from.strftime("%d/%m") %> → <%= p.to.strftime("%d/%m") %></span></td>
+            <td>
+              <%= p.label %><br><span class="muted small"><%= p.from.strftime("%d/%m") %> → <%= p.to.strftime("%d/%m") %></span>
+              <% if (aviso = weekday_gap_note(p)) %>
+                <br><span class="warn small">⚠ <%= aviso %></span>
+              <% end %>
+            </td>
             <td><%= money(p.current.total) %></td>
             <td><%= money(p.ly.total) %></td>
             <td><%= pct_badge(p.current.total, p.ly.total) %></td>

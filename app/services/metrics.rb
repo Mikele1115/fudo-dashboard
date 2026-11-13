@@ -36,7 +36,44 @@ class Metrics
   end
 
   # Acumulado de un período (semana, mes, año) y su equivalente del año anterior.
-  Period = Struct.new(:label, :from, :to, :current, :ly_from, :ly_to, :ly, keyword_init: true)
+  # weekday_gap avisa cuando las dos ventanas no tienen los mismos días de la semana (nil si cuadran).
+  Period = Struct.new(:label, :from, :to, :current, :ly_from, :ly_to, :ly, :weekday_gap, keyword_init: true)
+
+  # Desajuste de días de la semana entre las dos ventanas de un período.
+  #
+  # El mes y el año en curso se comparan por calendario (del 1 al 10 de noviembre contra el 1 al 10
+  # de noviembre del año pasado), y esas dos ventanas no siempre tienen los mismos días: noviembre
+  # de 2026 arranca en domingo y el de 2025 arrancó en sábado, así que una tiene dos sábados y la
+  # otra uno. Un sábado vende casi el doble que un martes, así que parte de la variación no es
+  # crecimiento, es el calendario. Esto lo mide para poder avisarlo.
+  #
+  #   days   = [["sábado", -1], ["martes", 1]] — solo los días que no cuadran
+  #   effect = pesos que el desajuste le suma (+) o le resta (-) al período en curso, valorando
+  #            cada día al promedio de ese día de la semana en el año en curso
+  #   share  = ese efecto como porcentaje del total del año anterior
+  WeekdayGap = Struct.new(:days, :effect, :share, keyword_init: true) do
+    # En una ventana larga un día de más se diluye y no cambia nada. Solo avisamos cuando pesa.
+    def material? = share.abs >= Metrics::MATERIAL_GAP_PCT
+
+    # true  -> el calendario favorece al período en curso (la variación se ve mejor de lo que fue)
+    # false -> lo perjudica (la variación se queda corta)
+    def favourable? = effect.positive?
+
+    # "un sábado menos y un martes más"
+    def text
+      partes = days.map { |name, diff| "#{cantidad(diff.abs)} #{plural(name, diff.abs)} #{diff.positive? ? 'más' : 'menos'}" }
+      return partes.first if partes.size == 1
+
+      "#{partes[0..-2].join(', ')} y #{partes[-1]}"
+    end
+
+    private
+
+    def cantidad(n) = n == 1 ? "un" : n.to_s
+
+    # Solo sábado y domingo cambian en plural; los demás ya terminan en s.
+    def plural(name, n) = (n == 1 || name.end_with?("s")) ? name : "#{name}s"
+  end
 
   # Un año completo de la comparativa, con su "mismo período" (1 ene -> misma fecha del día informado).
   YearRow = Struct.new(:year, :full, :ytd, :ytd_to, :complete, keyword_init: true)
@@ -63,9 +100,13 @@ class Metrics
 
   RECENT_DAYS    = 14
   CHART_DAYS     = 30
+  WEEKDAYS       = %w[domingo lunes martes miércoles jueves viernes sábado].freeze
   WEEKDAYS_SHORT = %w[Dom Lun Mar Mié Jue Vie Sáb].freeze
   MONTHS_SHORT   = %w[Ene Feb Mar Abr May Jun Jul Ago Sep Oct Nov Dic].freeze
   MONTHS         = %w[enero febrero marzo abril mayo junio julio agosto septiembre octubre noviembre diciembre].freeze
+
+  # Un desajuste de calendario que mueve el período menos que esto no cambia la lectura: no se avisa.
+  MATERIAL_GAP_PCT = 2.0
 
   # Venta neta: quita el IVA incluido en el total.
   def self.net(amount)
@@ -131,7 +172,32 @@ class Metrics
   # Suma de un rango de fechas y del rango equivalente del año anterior.
   def period(label, from, to, ly_from, ly_to)
     Period.new(label: label, from: from, to: to, current: sum(from..to),
-               ly_from: ly_from, ly_to: ly_to, ly: sum(ly_from..ly_to))
+               ly_from: ly_from, ly_to: ly_to, ly: sum(ly_from..ly_to),
+               weekday_gap: weekday_gap(from..to, ly_from..ly_to))
+  end
+
+  # Días de la semana que una ventana tiene y la otra no, y lo que ese desajuste vale en pesos.
+  # Devuelve nil cuando las dos ventanas tienen la misma composición, que es siempre el caso
+  # cuando se comparan restando 364 días (52 semanas exactas).
+  def weekday_gap(current, previous)
+    a = current.group_by(&:wday).transform_values(&:size)
+    b = previous.group_by(&:wday).transform_values(&:size)
+    diffs = (0..6).filter_map { |w| (d = a.fetch(w, 0) - b.fetch(w, 0)).zero? ? nil : [w, d] }
+    return nil if diffs.empty?
+
+    effect = diffs.sum { |w, d| d * weekday_avg_total(w, current.last) }
+    base   = sum(previous).total
+    WeekdayGap.new(
+      days:   diffs.map { |w, d| [WEEKDAYS[w], d] },
+      effect: effect,
+      share:  base.positive? ? effect / base * 100.0 : 0.0
+    )
+  end
+
+  # Lo que vende un día de la semana en promedio, en lo que va del año de up_to. Se usa el año
+  # entero y no solo la ventana para que el promedio no dependa de uno o dos días concretos.
+  def weekday_avg_total(wday, up_to)
+    average((Date.new(up_to.year, 1, 1)..up_to).select { |x| x.wday == wday }).avg_total || 0.0
   end
 
   # Totales de un conjunto de fechas (los días sin datos cuentan como 0).

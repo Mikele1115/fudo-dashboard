@@ -11,7 +11,8 @@ Año anterior (<%= long_date(@m.ly_date) %>):
 
 Acumulados:
 <% @m.periods.each do |p| %>  <%= p.label %>: <%= money(p.current.total) %> vs. <%= money(p.ly.total) %> el año anterior (<%= pct_text(p.current.total, p.ly.total) %>) — ticket por persona <%= money(p.current.avg_per_person) %> (<%= pct_text(p.current.avg_per_person, p.ly.avg_per_person) %>)
-<% end %>
+<% if (aviso = weekday_gap_note(p)) %>    Ojo: <%= aviso %>
+<% end %><% end %>
 Comparativa de todos los años (1 ene → <%= @m.report_date.strftime("%d/%m") %>):
 <% @m.years.each_with_index do |y, i| %><% prev = @m.years[i + 1]&.ytd %>  <%= y.year %>: <%= money(y.ytd.total) %> (<%= pct_text(y.ytd.total, prev&.total) %>) — <%= int(y.ytd.tickets) %> tickets, ticket por persona <%= money(y.ytd.avg_per_person) %><%= y.complete ? " — año completo: #{money(y.full.total)}" : "" %>
 <% end %>

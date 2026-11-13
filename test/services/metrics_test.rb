@@ -100,4 +100,39 @@ class MetricsTest < ActiveSupport::TestCase
     assert_nil r.periods.first.current.avg_per_person
     assert_equal 30, r.charts[:last_days][:labels].size
   end
+
+  # ---------- desajuste de días de la semana ----------
+
+  test "el mes avisa cuando las dos ventanas no tienen los mismos días de la semana" do
+    # Del 1 al 12 de septiembre de 2026 hay dos sábados y un lunes; en 2025, un sábado y dos lunes.
+    DailySale.create!(date: Date.new(2025, 9, 5), total: 5000, tickets: 50) # para que el año anterior no sea cero
+    gap = Metrics.new(REPORT).build.periods[1].weekday_gap
+
+    assert_equal [["lunes", -1], ["sábado", 1]], gap.days
+    assert_equal "un lunes menos y un sábado más", gap.text
+    assert_in_delta 895.0, gap.effect, 0.01 # el sábado promedio de 2026: (1190 + 600) / 2
+    assert gap.favourable?, "el sábado de más le juega a favor a la ventana de 2026"
+    assert gap.material?
+  end
+
+  test "la semana no avisa nunca porque se compara con los mismos días de la semana" do
+    assert_nil Metrics.new(REPORT).build.periods[0].weekday_gap
+  end
+
+  test "un desajuste que no mueve el total no se avisa" do
+    chico  = Metrics::WeekdayGap.new(days: [["lunes", 1]], effect: 1000.0, share: 1.9)
+    grande = Metrics::WeekdayGap.new(days: [["lunes", 1]], effect: 1000.0, share: -2.1)
+
+    assert_not chico.material?, "en una ventana larga un día de más se diluye"
+    assert grande.material?
+  end
+
+  test "el texto del desajuste pluraliza y enumera los días" do
+    texto = ->(days) { Metrics::WeekdayGap.new(days: days, effect: 0.0, share: 0.0).text }
+
+    assert_equal "un martes más",   texto.([["martes", 1]])
+    assert_equal "2 sábados menos", texto.([["sábado", -2]])
+    assert_equal "un lunes menos, un martes más y 2 domingos más",
+                 texto.([["lunes", -1], ["martes", 1], ["domingo", 2]])
+  end
 end
