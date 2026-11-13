@@ -10,9 +10,9 @@ Semana pasada: <%= money(r.previous.spend) %><% if r.spend_change_pct %> (<%= pc
 Precios netos, sin IVA.
 <% if r.alerts.any? -%>
 
-ALERTAS DE PRECIO (<%= r.alerts.size %>)
+ALERTAS: <%= PriceAlert.headline(r.alerts) %>
 <% r.alerts.each do |a| -%>
-  <%= a.ingredient_name %>: <%= money(a.baseline_price) %> -> <%= money(a.new_price) %> (<%= pct_text(a.new_price.to_f, a.baseline_price.to_f) %>), costó <%= money(a.overcost) %> de más
+  <%= a.ingredient_name %>: <%= money(a.baseline_price) %> -> <%= money(a.new_price) %> (<%= pct_text(a.new_price.to_f, a.baseline_price.to_f) %>)<% if a.suspect? %> — REVISAR CARGA: el monto coincide con otra compra al precio habitual, el precio no subió<% else %>, costó <%= money(a.overcost) %> de más<% end %>
 <% end -%>
 <% end -%>
 

@@ -24,17 +24,23 @@ class PurchasesMailer < ApplicationMailer
     @name   = AppSettings.restaurant_name
     return if @alerts.empty?
 
+    # El asunto no puede decir "subió un 164%" de una compra cuya cantidad está mal
+    # cargada: el precio no subió. Para esas, el asunto manda a revisar la carga.
     titulo = if @alerts.size == 1
                a = @alerts.first
-               "#{a.ingredient_name} subió #{pct_text(a.new_price.to_f, a.baseline_price.to_f)}"
+               if a.suspect?
+                 "#{a.ingredient_name}: revisar la cantidad cargada"
+               else
+                 "#{a.ingredient_name} subió #{pct_text(a.new_price.to_f, a.baseline_price.to_f)}"
+               end
              else
-               "#{@alerts.size} insumos subieron de precio"
+               PriceAlert.headline(@alerts)
              end
 
     mail(
       to:      AppSettings.mail_to,
       from:    AppSettings.mail_from,
-      subject: "[#{@name}] Alerta de precios — #{titulo}"
+      subject: "[#{@name}] #{@alerts.all?(&:suspect?) ? 'Revisar cargas' : 'Alerta de precios'} — #{titulo}"
     )
   end
 end

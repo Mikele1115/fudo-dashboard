@@ -73,4 +73,33 @@ class QuantityTyposTest < ActiveSupport::TestCase
 
     assert_empty QuantityTypos.all
   end
+
+  # ---------- twin_for: la pregunta para UNA línea, sin MIN_REPEAT ----------
+
+  test "twin_for encuentra la gemela aunque esa cantidad se haya comprado una sola vez" do
+    # Mismos datos que el test anterior, donde `all` se calla por prudencia. Para no
+    # llamar "subida de precio" a un error de carga no hace falta tanta: basta con que
+    # el monto coincida con una compra al precio habitual. Es el caso de la Ndjua del
+    # 11/11/2026, donde la alerta salió como un +164% que nunca ocurrió.
+    6.times { buy(name: "Menta", qty: 0.3, total: 6504) }
+    gemela = buy(name: "Menta", qty: 0.2, total: 4336)
+    mala   = buy(name: "Menta", qty: 0.5, total: 4336)
+
+    assert_empty QuantityTypos.all, "`all` sigue exigiendo MIN_REPEAT para proponer una cantidad"
+    assert_equal gemela.id, QuantityTypos.twin_for(mala)&.id
+  end
+
+  test "twin_for no inventa una gemela cuando el monto no coincide con nada" do
+    5.times { buy(name: "Prosciutto", qty: 4, total: 78_244) }
+    otra = buy(name: "Prosciutto", qty: 4, total: 39_122) # mitad de precio, monto inédito
+
+    assert_nil QuantityTypos.twin_for(otra)
+  end
+
+  test "twin_for se calla cuando el precio de la línea no se desvía lo suficiente" do
+    5.times { buy(name: "Prosciutto", qty: 4, total: 78_244) }
+    casi = buy(name: "Prosciutto", qty: 4.4, total: 78_244) # -9%: variación normal
+
+    assert_nil QuantityTypos.twin_for(casi), "una diferencia chica puede ser un precio real"
+  end
 end

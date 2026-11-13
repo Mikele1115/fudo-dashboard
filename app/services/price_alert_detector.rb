@@ -12,7 +12,7 @@
 # umbral de +10% a +30% solo quita 4 avisos al año. El que hace el trabajo es el
 # filtro de plata, no el porcentaje.
 #
-# Dos decisiones de diseño que evitan falsos positivos:
+# Tres decisiones de diseño que evitan falsos positivos:
 #
 #   - Se compara contra la MEDIANA de las compras recientes del insumo, no contra
 #     la compra anterior. Hay insumos cuyo precio oscila entre dos valores (dos
@@ -20,6 +20,12 @@
 #     "+150%" una y otra vez sin estar subiendo.
 #   - Se ignoran las compras marcadas como dudosas por IngredientPrices (gramos
 #     cargados como kilos y similares). Si no, cada error de carga sería una alerta.
+#   - Ese filtro solo descarta lo que está más de 4x fuera de la mediana, y hay errores
+#     más chicos que pasan: cargar 0,72 kg de lo que fueron 1,8 deja el precio 2,6 veces
+#     alto, no 4. Por eso, antes de avisar, se le pregunta a QuantityTypos si el MONTO de
+#     la línea coincide al peso con otra compra al precio habitual. Si coincide, la plata
+#     que salió es la misma y la alerta se guarda marcada como cantidad mal cargada: el
+#     correo manda a revisar la carga en vez de anunciar una subida que no hubo.
 class PriceAlertDetector
   CHANGE_PCT    = 15.0    # subida mínima respecto a la mediana reciente
   MIN_OVERCOST  = 20_000  # lo que esa compra costó de más, en pesos
@@ -83,6 +89,12 @@ class PriceAlertDetector
     return nil if annual_spend(purchase) < MIN_SPEND
     return nil if recently_alerted?(purchase)
 
+    # Un precio unitario disparado también sale de cargar menos cantidad de la que se
+    # compró. Si el monto de la línea coincide al peso con otra compra al precio habitual,
+    # la plata que salió es la misma y lo que está mal es la cantidad: se avisa igual,
+    # porque hay algo que revisar, pero marcado como carga y no como subida de precio.
+    twin = QuantityTypos.twin_for(purchase)
+
     PriceAlert.create!(
       fudo_item_id:       purchase.fudo_item_id,
       fudo_ingredient_id: purchase.fudo_ingredient_id,
@@ -94,7 +106,10 @@ class PriceAlertDetector
       new_price:          new_price,
       change_pct:         change,
       overcost:           overcost,
-      quantity:           purchase.quantity
+      quantity:           purchase.quantity,
+      suspect_quantity:   twin.present?,
+      twin_quantity:      twin&.quantity,
+      twin_purchased_on:  twin&.purchased_on
     )
   end
 

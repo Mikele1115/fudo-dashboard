@@ -101,4 +101,51 @@ class PriceAlertDetectorTest < ActiveSupport::TestCase
     PriceAlertDetector.run!(since: TODAY - 5)
     assert_equal 1, PriceAlert.count
   end
+
+  # ---------- cantidad mal cargada vs. subida de precio ----------
+
+  test "una cantidad mal cargada se avisa como carga y no como subida de precio" do
+    # El caso real de la Ndjua del 11/11/2026: el monto es exactamente el de una compra
+    # normal, pero cargado con otra cantidad. El precio unitario se dispara x2,5 —no llega
+    # al x4 que descarta el filtro de líneas dudosas— y la alerta salía como "+164%".
+    historial_estable
+    buy(on: TODAY - 20, qty: 30, unit_total: 30 * 7_000) # compra normal de 30 kg: $210.000
+    buy(on: TODAY - 1,  qty: 12, unit_total: 30 * 7_000) # los mismos $210.000 como 12 kg
+
+    alertas = PriceAlertDetector.run!(since: TODAY - 5)
+
+    assert_equal 1, alertas.size
+    a = alertas.first
+    assert a.suspect?, "el monto coincide con la compra de 30 kg: lo que está mal es la cantidad"
+    assert_in_delta 30, a.twin_quantity, 0.001
+    assert_equal TODAY - 20, a.twin_purchased_on
+    assert_equal 0.0, a.real_overcost, "no hubo sobrecosto: salió la misma plata"
+    assert_in_delta 17_500, a.new_price, 1, "el dato no se corrige, solo se marca"
+    assert_in_delta 126_000, a.overcost, 1, "el sobrecosto aparente se guarda igual, para poder mirarlo"
+  end
+
+  test "una subida real no se marca como carga mal hecha" do
+    historial_estable
+    buy(on: TODAY - 1, qty: 20, unit_total: 20 * 10_000)
+
+    a = PriceAlertDetector.run!(since: TODAY - 5).first
+
+    assert_not a.suspect?
+    assert_in_delta 60_000, a.real_overcost, 1
+    assert_nil a.twin_quantity
+  end
+
+  test "el titular distingue las subidas de las cargas por revisar" do
+    historial_estable
+    buy(on: TODAY - 20, qty: 30, unit_total: 30 * 7_000)
+    buy(on: TODAY - 2,  qty: 12, unit_total: 30 * 7_000)              # carga mal hecha
+    buy(on: TODAY - 1,  qty: 20, unit_total: 20 * 10_000, ingredient_id: 2, name: "Harina")
+    10.times { |i| buy(on: TODAY - 30 - (i * 20), qty: 20, unit_total: 20 * 7_000, ingredient_id: 2, name: "Harina") }
+
+    alertas = PriceAlertDetector.run!(since: TODAY - 5)
+
+    assert_equal 2, alertas.size
+    assert_equal 1, alertas.count(&:suspect?)
+    assert_equal "Un insumo subió de precio y una carga para revisar", PriceAlert.headline(alertas)
+  end
 end

@@ -47,7 +47,7 @@
     <tr><td style="padding:16px 28px 8px;">
       <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:14px 16px;">
         <div style="font-size:15px;font-weight:600;color:#92400e;margin-bottom:6px;">
-          ⚠ <%= r.alerts.size %> alerta<%= "s" if r.alerts.size > 1 %> de precio esta semana
+          ⚠ <%= PriceAlert.headline(r.alerts) %> esta semana
         </div>
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;">
           <% r.alerts.each do |a| %>
@@ -55,10 +55,21 @@
               <td style="<%= td %>"><%= a.ingredient_name %> <span style="color:#6b7280;font-size:12px;">/ <%= a.unit_label %></span></td>
               <td style="<%= tdr %>"><%= money(a.baseline_price) %> → <strong><%= money(a.new_price) %></strong></td>
               <td style="<%= tdr %>"><%= price_pct_inline(a.new_price.to_f, a.baseline_price.to_f) %></td>
-              <td style="<%= tdr %>">costó <strong><%= money(a.overcost) %></strong> de más</td>
+              <% if a.suspect? %>
+                <td style="<%= tdr %>color:#92400e;"><strong>revisar carga</strong></td>
+              <% else %>
+                <td style="<%= tdr %>">costó <strong><%= money(a.overcost) %></strong> de más</td>
+              <% end %>
             </tr>
           <% end %>
         </table>
+        <% if r.alerts.any?(&:suspect?) %>
+          <div style="font-size:12px;color:#92400e;margin-top:8px;">
+            En las marcadas <strong>revisar carga</strong> el precio no subió: el monto coincide al peso con otra
+            compra al precio de siempre, así que lo mal cargado es la cantidad.
+            <a href="<%= review_ingredients_url %>" style="color:#92400e;">Revisar cargas</a>.
+          </div>
+        <% end %>
       </div>
     </td></tr>
   <% end %>

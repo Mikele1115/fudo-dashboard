@@ -55,7 +55,8 @@ Rails.application.configure do
   # config.action_mailer.raise_delivery_errors = false
 
   # Set host to be used by links generated in mailer templates.
-  config.action_mailer.default_url_options = { host: "ciudaddepie.enmipccorre.dev" }
+  # El protocolo va explícito: con force_ssl un enlace http solo funciona por redirección.
+  config.action_mailer.default_url_options = { host: "ciudaddepie.enmipccorre.dev", protocol: "https" }
 
   # Specify outgoing SMTP server. Remember to add smtp/* credentials via bin/rails credentials:edit.
   # config.action_mailer.smtp_settings = {

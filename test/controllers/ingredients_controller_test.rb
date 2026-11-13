@@ -59,4 +59,37 @@ class IngredientsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "a[href=?]", review_ingredients_path, text: /Revisar cargas \(1\)/
   end
+
+  def alerta(suspect:)
+    PriceAlert.create!(
+      fudo_item_id: 9001, fudo_ingredient_id: 1, ingredient_name: "Ndjua piccante", unit_name: "kg",
+      provider_name: "QI FOOD", purchased_on: HOY, baseline_price: 17_900, new_price: 47_250,
+      change_pct: 164.0, overcost: 21_132, quantity: 0.72, suspect_quantity: suspect,
+      twin_quantity: (1.8 if suspect), twin_purchased_on: (HOY - 14 if suspect)
+    )
+  end
+
+  test "el panel marca la alerta cuya cantidad no cuadra con la plata" do
+    buy(name: "Ndjua piccante", qty: 0.72, total: 34_020)
+    alerta(suspect: true)
+
+    get ingredients_path
+
+    assert_response :success
+    assert_select "h2", text: /Una carga para revisar/
+    assert_match "revisar carga", response.body
+    assert_no_match(/21\.132/, response.body, "el sobrecosto no ocurrió: no se muestra como plata perdida")
+  end
+
+  test "el panel sigue mostrando el sobrecosto de una subida real" do
+    buy(name: "Ndjua piccante", qty: 0.72, total: 34_020)
+    alerta(suspect: false)
+
+    get ingredients_path
+
+    assert_response :success
+    assert_select "h2", text: /Un insumo subió de precio/
+    assert_match "21.132", response.body
+    assert_no_match(/revisar carga/, response.body)
+  end
 end

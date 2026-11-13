@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_06_211213) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_13_133440) do
   create_table "daily_sales", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.date "date", null: false
@@ -92,6 +92,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_06_211213) do
     t.string "provider_name"
     t.date "purchased_on", null: false
     t.decimal "quantity", precision: 14, scale: 4, null: false
+    t.boolean "suspect_quantity", default: false, null: false
+    t.date "twin_purchased_on"
+    t.decimal "twin_quantity", precision: 14, scale: 4
     t.string "unit_name"
     t.datetime "updated_at", null: false
     t.index ["fudo_ingredient_id", "purchased_on"], name: "index_price_alerts_on_fudo_ingredient_id_and_purchased_on"

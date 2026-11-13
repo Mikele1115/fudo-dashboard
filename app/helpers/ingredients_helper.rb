@@ -72,6 +72,32 @@ module IngredientsHelper
              title: "La variación se calcula con #{n} compra(s) en un extremo: no entra en la canasta ni en el impacto en pesos")
   end
 
+  # Etiqueta para la alerta cuya cantidad no cuadra con la plata. No afirma cuál es la
+  # cantidad correcta: dice qué monto se pagó antes y por cuánto, y que hay que mirarlo.
+  def alert_suspect_tag(alert)
+    return "" unless alert.suspect?
+
+    tag.span("revisar carga", class: "tag tag--warn", title: alert_suspect_title(alert))
+  end
+
+  def alert_suspect_title(alert)
+    detalle = if alert.twin_quantity.present? && alert.twin_purchased_on.present?
+                "El mismo monto se pagó el #{alert.twin_purchased_on.strftime('%d/%m/%Y')} por " \
+                  "#{number_with_precision(alert.twin_quantity, precision: 2, separator: ',')} #{alert.unit_label}"
+              else
+                "El monto coincide con otra compra al precio habitual"
+              end
+    "#{detalle}, así que el precio no subió: lo que está mal cargado es la cantidad."
+  end
+
+  # El "costó de más" de una alerta. Si la cantidad está mal cargada no hubo sobrecosto
+  # —salió la misma plata—, así que no se muestra un número que no pasó.
+  def alert_overcost(alert)
+    return tag.span("—", class: "muted", title: "La plata que salió es la misma") if alert.suspect?
+
+    money(alert.overcost)
+  end
+
   # "a mano" / "por regla" / "—": de dónde salió la categoría de un insumo.
   def assignment_origin(ingredient_id)
     a = IngredientAssignment.find_by(fudo_ingredient_id: ingredient_id)

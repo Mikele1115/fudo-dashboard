@@ -173,11 +173,12 @@
       <tr><th>Insumo</th><th>Se pagaba</th><th>Esa compra</th><th>Variación</th><th>Costó de más</th><th>Fecha</th></tr>
       <% @alerts.each do |al| %>
         <tr>
-          <td><%= link_to al.ingredient_name, ingredient_path(al.fudo_ingredient_id) %></td>
+          <td><%= link_to al.ingredient_name, ingredient_path(al.fudo_ingredient_id) %>
+              <%= alert_suspect_tag(al) %></td>
           <td><%= money(al.baseline_price) %></td>
           <td><strong><%= money(al.new_price) %></strong></td>
           <td><%= price_change_badge(al.new_price.to_f, al.baseline_price.to_f) %></td>
-          <td><%= money(al.overcost) %></td>
+          <td><%= alert_overcost(al) %></td>
           <td class="muted small"><%= al.purchased_on.strftime("%d/%m/%y") %></td>
         </tr>
       <% end %>

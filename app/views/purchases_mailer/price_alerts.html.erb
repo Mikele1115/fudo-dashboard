@@ -12,20 +12,33 @@
   <tr><td style="background:#92400e;color:#ffffff;padding:20px 28px;">
     <div style="font-size:13px;letter-spacing:.08em;text-transform:uppercase;opacity:.8;">🍕 <%= @name %></div>
     <div style="font-size:22px;font-weight:600;margin-top:4px;">
-      <%= @alerts.size == 1 ? "Un insumo subió de precio" : "#{@alerts.size} insumos subieron de precio" %>
+      <%= PriceAlert.headline(@alerts) %>
     </div>
   </td></tr>
 
   <tr><td style="padding:20px 28px 8px;">
+    <% sobrecosto = @alerts.sum(&:real_overcost) %>
+    <% cargas = @alerts.select(&:suspect?) %>
     <p style="margin:0 0 14px;color:#374151;">
-      <%= @alerts.size == 1 ? "Esta compra salió" : "Estas compras salieron" %>
-      bastante por encima de lo que se venía pagando. El total de sobrecosto es
-      <strong><%= money(@alerts.sum { |a| a.overcost.to_f }) %></strong>.
+      <% if sobrecosto.positive? %>
+        <%= @alerts.size - cargas.size == 1 ? "Una compra salió" : "Hay compras que salieron" %>
+        bastante por encima de lo que se venía pagando: <strong><%= money(sobrecosto) %></strong> de sobrecosto.
+      <% end %>
+      <% if cargas.any? %>
+        <%= cargas.size == 1 ? "Hay una compra" : "Hay #{cargas.size} compras" %>
+        donde el precio unitario salió disparado pero el monto coincide al peso con otra compra
+        al precio de siempre: ahí el precio no subió, la cantidad está mal cargada.
+        <a href="<%= review_ingredients_url %>" style="color:#92400e;">Revisar cargas</a>.
+      <% end %>
     </p>
 
     <% @alerts.each do |a| %>
-      <div style="border:1px solid #e5e7eb;border-left:4px solid #b91c1c;border-radius:6px;padding:14px 16px;margin-bottom:12px;">
-        <div style="font-size:16px;font-weight:600;"><%= a.ingredient_name %></div>
+      <div style="border:1px solid #e5e7eb;border-left:4px solid <%= a.suspect? ? "#d97706" : "#b91c1c" %>;border-radius:6px;padding:14px 16px;margin-bottom:12px;">
+        <div style="font-size:16px;font-weight:600;"><%= a.ingredient_name %>
+          <% if a.suspect? %>
+            <span style="font-size:11px;font-weight:600;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:2px 8px;vertical-align:middle;">revisar carga</span>
+          <% end %>
+        </div>
         <div style="font-size:13px;color:#6b7280;margin-bottom:8px;">
           Comprado el <%= a.purchased_on.strftime("%d/%m/%Y") %>
           <% if a.provider_name.present? %>a <%= a.provider_name %><% end %>
@@ -45,9 +58,32 @@
             <td style="<%= tdr %>"><%= number_with_precision(a.quantity, precision: 2, delimiter: ".", separator: ",") %> <%= a.unit_label %></td>
           </tr>
           <tr>
-            <td style="<%= td %>color:#6b7280;">Costó de más</td>
-            <td style="<%= tdr %>color:#b91c1c;font-weight:600;"><%= money(a.overcost) %></td>
+            <td style="<%= td %>color:#6b7280;">Monto de la compra</td>
+            <td style="<%= tdr %>"><%= money(a.new_price.to_f * a.quantity.to_f) %></td>
           </tr>
+          <% if a.suspect? %>
+            <tr>
+              <td style="<%= td %>color:#6b7280;">Ese mismo monto</td>
+              <td style="<%= tdr %>color:#92400e;font-weight:600;">
+                <% if a.twin_purchased_on.present? %>
+                  ya se pagó el <%= a.twin_purchased_on.strftime("%d/%m/%Y") %>
+                  por <%= number_with_precision(a.twin_quantity, precision: 2, delimiter: ".", separator: ",") %> <%= a.unit_label %>
+                <% else %>
+                  coincide con otra compra al precio habitual
+                <% end %>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="2" style="<%= td %>color:#92400e;">
+                El precio no subió: salió la misma plata. Lo que hay que corregir en Fudo es la cantidad.
+              </td>
+            </tr>
+          <% else %>
+            <tr>
+              <td style="<%= td %>color:#6b7280;">Costó de más</td>
+              <td style="<%= tdr %>color:#b91c1c;font-weight:600;"><%= money(a.overcost) %></td>
+            </tr>
+          <% end %>
         </table>
       </div>
     <% end %>
@@ -58,6 +94,10 @@
     sin contar las líneas mal cargadas. Precios netos, sin IVA.
     Solo se avisa de insumos que pesan en el gasto anual y cuando el sobrecosto supera
     <%= money(PriceAlertDetector::MIN_OVERCOST) %>.
+    <% if @alerts.any?(&:suspect?) %>
+      Una compra marcada como <strong>revisar carga</strong> no cuenta como sobrecosto:
+      el monto coincide con otra compra al precio habitual, así que la plata que salió es la misma.
+    <% end %>
   </td></tr>
 
 </table>

@@ -3,7 +3,8 @@
 # Resumen semanal de las compras de insumos: qué se compró, cuánto se gastó,
 # qué se movió de precio y qué quedó mal cargado.
 #
-# La semana va de lunes a viernes (el informe sale el viernes por la noche).
+# Cubre la semana anterior completa, de lunes a domingo, y el correo sale el lunes a las
+# 12:00 (config/recurring.yml). Enviado el lunes 9, cubre del lunes 2 al domingo 8.
 class WeeklyPurchasesReport
   Line = Struct.new(:ingredient_id, :name, :unit, :quantity, :spend, :purchases,
                     :last_price, :prev_price, :providers, keyword_init: true) do

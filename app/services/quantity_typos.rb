@@ -82,6 +82,39 @@ class QuantityTypos
 
   def since(from) = findings.select { |f| f.on >= from }
 
+  # La compra al precio habitual cuyo monto coincide al peso con el de ESTA línea, o nil.
+  #
+  # Es la misma pregunta que `all` pero para una sola línea y sin exigir MIN_REPEAT: para
+  # proponerte "la cantidad correcta son 1,8 kg" hay que ser prudente y pedir que esa
+  # cantidad se haya comprado varias veces, pero para NO llamar "subida de precio" a un
+  # error de carga basta con que el monto coincida con una compra normal.
+  #
+  # Esa diferencia es justo la que dejó pasar la alerta de la Ndjua del 11/11/2026: los
+  # $34.020 son exactamente lo que se pagó el 28/10 por 1,8 kg al precio de siempre, pero
+  # 1,8 kg se había comprado una sola vez, así que `all` se calló y la alerta salió como
+  # si el precio hubiera subido un 164%.
+  def self.twin_for(purchase) = new.twin_for(purchase)
+
+  def twin_for(purchase)
+    monto = purchase.line_total.to_f
+    return nil unless monto.positive?
+
+    lineas = IngredientPurchase.where(fudo_ingredient_id: purchase.fudo_ingredient_id).chronological.to_a
+    normal = precio_habitual(lineas)
+    return nil if normal.nil?
+
+    # La línea sospechosa no puede formar parte de su propia referencia.
+    normales = lineas.reject { |l| l.id == purchase.id }
+                     .select  { |l| cerca?(l.unit_price.to_f, normal, NORMAL_BAND) }
+    return nil if normales.size < MIN_NORMAL
+    return nil unless (purchase.unit_price.to_f - normal).abs / normal >= PRICE_TOL
+
+    normales.find do |n|
+      cerca?(n.line_total.to_f, monto, MONEY_TOL) &&
+        !cerca?(purchase.quantity.to_f, n.quantity.to_f, QTY_TOL)
+    end
+  end
+
   private
 
   def buscar

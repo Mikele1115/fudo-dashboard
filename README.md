@@ -333,12 +333,28 @@ cada tres días—. Con los filtros de dinero quedan unos 30, todos con un motiv
 El hallazgo que importa: **con esos filtros puestos, mover el umbral de +10% a +30% solo
 quita 4 avisos al año**. El que hace el trabajo es el filtro de plata, no el porcentaje.
 
-Dos detalles que evitan falsos positivos:
+Tres detalles que evitan falsos positivos:
 
 - Se compara contra la **mediana reciente** del insumo, no contra la compra anterior.
   Hay precios que oscilan entre dos valores (dos formatos, dos proveedores): comparando
   con la anterior, la Salsiccia saltaba "+150%" una y otra vez sin estar subiendo.
 - Las líneas mal cargadas se ignoran, igual que en el resto del análisis.
+- Ese filtro solo descarta lo que está más de 4x fuera de la mediana, y hay errores de
+  carga más chicos que pasan. Antes de avisar se le pregunta a `QuantityTypos.twin_for`
+  si el **monto** de la línea coincide al peso con otra compra al precio habitual. Si
+  coincide, la plata que salió del local es la misma y lo que está mal es la cantidad: la
+  alerta se guarda con `suspect_quantity` y el correo manda a **Revisar cargas** en vez de
+  anunciar una subida. El dato de Fudo no se toca, igual que en el resto del informe.
+
+  `twin_for` no exige `MIN_REPEAT` (que la cantidad correcta se haya comprado varias
+  veces) a propósito: eso hace falta para *proponerte* una cantidad, no para negarse a
+  llamar "subida" a un error. Es lo que dejó pasar la primera alerta que mandó el sistema
+  —Ndjua piccante, 11/11/2026, "+164%"—, cuando los $34.020 eran exactamente lo que se
+  había pagado el 28/10 por 1,8 kg al precio de siempre, cargados como 0,72 kg.
+
+Una alerta no caduca cuando corriges el dato en Fudo: queda archivada con el botón
+**Vista**. Si corriges la cantidad, el análisis de precios se arregla solo en la siguiente
+sincronización, pero la alerta vieja sigue en el historial del insumo.
 
 Fudo no tiene webhooks: su API es solo de lectura por consulta. Los saltos se detectan
 en la sincronización nocturna, así que el aviso llega **a la mañana siguiente**.

@@ -59,11 +59,11 @@
       <tr><th>Fecha</th><th>Se pagaba</th><th>Se pagó</th><th>Variación</th><th>Costó de más</th><th>Estado</th></tr>
       <% @alerts.each do |a| %>
         <tr>
-          <td><%= a.purchased_on.strftime("%d/%m/%Y") %></td>
+          <td><%= a.purchased_on.strftime("%d/%m/%Y") %> <%= alert_suspect_tag(a) %></td>
           <td><%= money(a.baseline_price) %></td>
           <td><strong><%= money(a.new_price) %></strong></td>
           <td><%= price_change_badge(a.new_price.to_f, a.baseline_price.to_f) %></td>
-          <td><%= money(a.overcost) %></td>
+          <td><%= alert_overcost(a) %></td>
           <td class="muted small"><%= a.acknowledged? ? "vista" : "pendiente" %></td>
         </tr>
       <% end %>
