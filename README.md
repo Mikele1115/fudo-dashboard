@@ -201,12 +201,21 @@ parámetro **no recorta solo atributos, también recorta las relaciones**. Sin p
 Por eso `Fudo::Client#ingredients` **no restringe campos**. Si alguna vez se optimiza esa
 llamada, comprobar que la categoría sigue llegando.
 
-#### Tres reglas que no son evidentes
+#### Cuatro reglas que no son evidentes
 
 **La ventana se adapta al período.** Las variaciones comparan los primeros N días con
 los últimos N. N es un tercio del período, entre 21 y 90 días. Era fijo en 90, y eso
 dejaba el período de «3 meses» (91 días) completamente vacío: las dos ventanas se
 solapaban enteras y ningún insumo tenía con qué compararse.
+
+**Y por debajo de 63 días deja de partirse** (`SPLIT_MIN_DAYS`). En «1 mes» un tercio
+son 10 días, el suelo de 21 los levanta y las dos ventanas se pisan 12 días: una misma
+compra sería el «antes» y el «después» a la vez. Para esos períodos la referencia es el
+**período anterior del mismo largo** —el mes elegido contra el mes de antes—, que además
+de ser lo que uno espera al pedir «1 mes» pone un mes entero a cada lado en vez de dos
+trozos de 10 días. Con los datos reales eso da 90 insumos con variación y 42 fiables,
+contra los 3 o 4 que sobrevivirían a ventanas de 10 días. La leyenda de la cabecera dice
+cuál de los dos criterios está en uso (`IngredientPrices#comparison_note`).
 
 **El «precio normal» mira siempre un año** (`ANCHOR_DAYS`), no el período elegido. La
 mediana que decide qué compras son dudosas se calcula sobre el historial amplio, porque

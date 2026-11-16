@@ -25,6 +25,50 @@ class IngredientPricesWindowTest < ActiveSupport::TestCase
     assert_equal 90, IngredientPrices.new(period: "24", to: HOY).window_days
   end
 
+  test "los períodos largos se parten en dos y el de 1 mes se compara con el mes anterior" do
+    # Partir 30 días en dos no se puede: un tercio son 10 días, el suelo los sube a 21
+    # y las dos ventanas se pisarían 12 días, o sea que una misma compra sería el
+    # "antes" y el "después" a la vez.
+    assert_equal :previous, IngredientPrices.new(period: "1",  to: HOY).compare_mode
+    assert_equal :split,    IngredientPrices.new(period: "3",  to: HOY).compare_mode
+    assert_equal :split,    IngredientPrices.new(period: "12", to: HOY).compare_mode
+  end
+
+  test "en 1 mes la referencia son las compras del mes anterior, no las del propio mes" do
+    4.times { |i| buy(on: HOY - 55 + (i * 5), unit_total: 6_000) } # mes anterior
+    4.times { |i| buy(on: HOY - 25 + (i * 5), unit_total: 7_500) } # mes elegido
+
+    a   = IngredientPrices.new(period: "1", to: HOY)
+    row = a.rows.first
+
+    assert_equal 6_000, row.baseline_price, "el antes sale del mes anterior"
+    assert_equal 7_500, row.recent_price,   "el ahora es el mes elegido entero"
+    assert_in_delta 25.0, row.change_pct, 0.01
+    assert_equal 4, row.baseline_n
+    assert_equal 4, row.recent_n
+    assert row.reliable?
+  end
+
+  test "en 1 mes un insumo sin compras el mes anterior no inventa una variación" do
+    4.times { |i| buy(on: HOY - 25 + (i * 5), unit_total: 7_500) }
+
+    row = IngredientPrices.new(period: "1", to: HOY).rows.first
+
+    assert_nil row.change_pct, "sin referencia no hay nada que comparar"
+    assert_equal 0, row.baseline_n
+  end
+
+  test "en 1 mes una compra mal cargada del mes anterior no ensucia la referencia" do
+    4.times { |i| buy(on: HOY - 55 + (i * 5), unit_total: 6_000) }
+    buy(on: HOY - 50, unit_total: 60_000) # 10x: error de carga en el mes de referencia
+    4.times { |i| buy(on: HOY - 25 + (i * 5), unit_total: 7_500) }
+
+    row = IngredientPrices.new(period: "1", to: HOY).rows.first
+
+    assert_equal 6_000, row.baseline_price, "la línea dudosa queda fuera del antes"
+    assert_in_delta 25.0, row.change_pct, 0.01
+  end
+
   test "el período de 3 meses sí calcula variaciones" do
     # Compras repartidas por los tres meses, subiendo de precio.
     4.times { |i| buy(on: HOY - 88 + (i * 5), unit_total: 6_000) }

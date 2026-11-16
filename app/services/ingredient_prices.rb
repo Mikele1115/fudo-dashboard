@@ -19,7 +19,8 @@
 # Las compras sospechosas no se borran: se listan aparte para poder corregirlas
 # en Fudo.
 class IngredientPrices
-  PERIODS = { "3" => "3 meses", "6" => "6 meses", "12" => "12 meses", "24" => "2 años", "all" => "Todo" }.freeze
+  PERIODS = { "1" => "1 mes", "3" => "3 meses", "6" => "6 meses", "12" => "12 meses",
+              "24" => "2 años", "all" => "Todo" }.freeze
   STABLE_PCT     = 2.0 # variaciones de menos de ±2% se consideran precio estable
   OUTLIER_FACTOR = 4.0 # veces por encima o por debajo de la mediana para marcar sospechosa
 
@@ -34,6 +35,16 @@ class IngredientPrices
   # se comparen trozos enormes, y un suelo de 21 para que no se compare ruido.
   MAX_WINDOW_DAYS = 90
   MIN_WINDOW_DAYS = 21
+
+  # Debajo de este largo, partir el período en dos no funciona: un tercio queda por
+  # debajo de MIN_WINDOW_DAYS, el suelo levanta la ventana y las dos mitades se pisan.
+  # En "1 mes" (30 días) las ventanas de 21 se solaparían 12 días, o sea que una misma
+  # compra sería a la vez el "antes" y el "después".
+  #
+  # Para esos períodos la comparación se hace CONTRA EL PERÍODO ANTERIOR del mismo
+  # largo: el mes elegido contra el mes de antes. Además de ser lo que uno espera al
+  # pedir "1 mes", pone un mes entero a cada lado en vez de dos trozos de 10 días.
+  SPLIT_MIN_DAYS = MIN_WINDOW_DAYS * 3
 
   # Historial mínimo sobre el que se calcula el "precio normal" de un insumo, la
   # mediana que decide qué compras son dudosas.
@@ -289,11 +300,30 @@ class IngredientPrices
 
   def period_label = PERIODS[@period_key]
 
-  # Un tercio del período, entre 21 y 90 días.
+  # :split    -> se comparan los primeros window_days del período con los últimos
+  # :previous -> se compara el período entero con el período anterior del mismo largo
+  def compare_mode = (@to - @from).to_i + 1 >= SPLIT_MIN_DAYS ? :split : :previous
+
+  def split? = compare_mode == :split
+
+  # Un tercio del período, entre 21 y 90 días. Solo se usa en modo :split.
   def window_days
     @window_days ||= begin
       tercio = ((@to - @from).to_i / 3.0).floor
       tercio.clamp(MIN_WINDOW_DAYS, MAX_WINDOW_DAYS)
+    end
+  end
+
+  # Primer día del período anterior, el que hace de referencia en modo :previous.
+  def previous_from = @from - ((@to - @from).to_i + 1)
+
+  # Cómo se calculan las variaciones, para decirlo en pantalla.
+  def comparison_note
+    if split?
+      "variaciones: primeros #{window_days} días contra los últimos #{window_days}"
+    else
+      "variaciones: contra los #{(@to - @from).to_i + 1} días anteriores " \
+        "(#{previous_from.strftime('%d/%m/%Y')} → #{(@from - 1).strftime('%d/%m/%Y')})"
     end
   end
 
@@ -324,6 +354,14 @@ class IngredientPrices
     end
   end
 
+  # Precios del período anterior, por insumo. Solo hace falta en modo :previous.
+  def previous_prices
+    @previous_prices ||= IngredientPurchase.between(previous_from, @from - 1)
+                                           .pluck(:fudo_ingredient_id, :unit_price)
+                                           .group_by(&:first)
+                                           .transform_values { |pares| pares.map { |(_, precio)| precio.to_f } }
+  end
+
   def build_row(ingredient_id, list)
     # El ancla viene del historial amplio; si el insumo no tuviera nada ahí, se
     # cae a la mediana del propio período.
@@ -338,10 +376,17 @@ class IngredientPrices
     spend  = clean.sum { |p| p.line_total.to_f }
     last   = clean.last
 
-    # Sin dos ventanas separadas no hay variación que medir (insumo nuevo o de compra única).
-    single_window = clean.first.purchased_on > last.purchased_on - window_days
-    baseline = single_window ? [] : window_prices(clean, clean.first.purchased_on, :forward)
-    recent   = window_prices(clean, last.purchased_on, :backward)
+    if split?
+      # Sin dos ventanas separadas no hay variación que medir (insumo nuevo o de compra única).
+      single_window = clean.first.purchased_on > last.purchased_on - window_days
+      baseline = single_window ? [] : window_prices(clean, clean.first.purchased_on, :forward)
+      recent   = window_prices(clean, last.purchased_on, :backward)
+    else
+      # Período corto: la referencia son las compras del período anterior, filtradas con
+      # la misma mediana ancla para que una línea mal cargada tampoco ensucie el "antes".
+      baseline = (previous_prices[ingredient_id] || []).select { |p| plausible?(p, median) }
+      recent   = prices
+    end
 
     Row.new(
       ingredient_id:  ingredient_id,

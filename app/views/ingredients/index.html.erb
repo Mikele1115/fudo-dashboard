@@ -9,7 +9,7 @@
       <%= a.from.strftime("%d/%m/%Y") %><span class="period__sep">→</span><%= a.to.strftime("%d/%m/%Y") %>
     </p>
     <p class="muted small">
-      Precios netos, sin IVA · variaciones: primeros <%= a.window_days %> días contra los últimos <%= a.window_days %>
+      Precios netos, sin IVA · <%= a.comparison_note %>
     </p>
   </div>
   <%# Ojo: el botón de actualizar va FUERA del formulario del período.
