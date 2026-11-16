@@ -287,6 +287,27 @@ Así que esto no mira el precio, mira el **monto**. Una línea se marca cuando:
 Si la plata que salió es la misma y la cantidad no, lo que falla es la cantidad — y la
 compra gemela dice cuál era. De ahí sale la columna «cantidad correcta».
 
+Entre varias gemelas posibles gana **la más cercana en el tiempo**. No es un detalle: 85
+de las 90 líneas marcadas tienen más de una compra que coincide en el monto. Elegir la
+primera que apareciera le daba a la Salsiccia del 11/11/2026 una gemela de agosto de 2024,
+a un precio que ya no existe, teniendo al lado la del 21/10/2026. «La más reciente» tampoco
+sirve: las líneas marcadas van de 2023 a 2026, y para una de agosto de 2025 la más reciente
+puede estar un año después.
+
+**Estas líneas no entran en ninguna mediana del informe de precios** (`typo_ids`), igual
+que las que se salen de `OUTLIER_FACTOR`. Hacía falta porque los errores de factor 2 pasan
+por debajo del corte de 4x: la burrata a $2.980/unidad —16 unidades cargadas donde eran 8—
+daba un «+100,0%» que nunca ocurrió y era el mayor aportante a la canasta de 1 mes. Al
+dejarlas fuera, el impacto de 3 meses cae de −$2.465.352 a −$364.147: casi dos millones de
+«ahorro» que eran una burrata mal tipeada.
+
+Pero **su monto sí cuenta en el gasto**, que es la premisa entera del detector: esa plata
+salió de la caja. Antes, las que además se pasaban de `OUTLIER_FACTOR` se descartaban
+enteras y su dinero desaparecía del KPI; ahora el gasto del histórico sube $1,1M, que es
+dinero real que no se estaba contando. Lo que no cuenta de ellas es el precio y la
+cantidad, que son las que mienten. Por eso `avg_price` divide solo el gasto de las líneas
+limpias entre la cantidad limpia: mezclar los dos daría un precio inventado.
+
 Los umbrales se midieron contra las 2.877 líneas reales, no se eligieron a ojo: con un
 desvío del 10% salían 180 líneas, casi todas fiambres y quesos que de verdad varían de
 precio entre compras. Con 40% quedan 90, en 27 insumos, y 85 tienen un factor limpio

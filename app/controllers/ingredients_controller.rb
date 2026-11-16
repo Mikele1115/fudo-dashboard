@@ -4,12 +4,15 @@
 class IngredientsController < ApplicationController
   def index
     @alerts = PriceAlert.pending.recent.limit(10)
-    @prices = IngredientPrices.new(period: params[:period])
+    # Un solo QuantityTypos.all por petición: lo necesitan el análisis de precios (para
+    # dejar las líneas mal cargadas fuera de las medianas) y el contador del botón.
+    typos   = QuantityTypos.all
+    @prices = IngredientPrices.new(period: params[:period], typos: typos)
     @sort   = params[:sort].presence || "rise"
     @query  = params[:q].to_s.strip
     @rows   = @prices.sorted(@sort)
     @rows   = @rows.select { |r| r.name.to_s.downcase.include?(@query.downcase) } if @query.present?
-    @typos  = QuantityTypos.all.size
+    @typos  = typos.size
   end
 
   # Lineas donde el monto cuadra y la cantidad no: errores de carga a corregir

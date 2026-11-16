@@ -150,4 +150,58 @@ class IngredientPricesTest < ActiveSupport::TestCase
     a = IngredientPrices.new(period: "12", to: TODAY)
     assert_equal a.spend_impact_total, a.grouped_by_fudo_category.sum(&:spend_impact)
   end
+
+  # ---------- líneas con la cantidad mal cargada ----------
+
+  # El caso de la burrata: precio real $5.960/unidad, con 16 unidades cargadas donde eran
+  # 8. El precio unitario queda a la mitad, que pasa por debajo del filtro de
+  # OUTLIER_FACTOR (x4) sin despeinarse, y tira la mediana reciente hacia abajo.
+  # Hacen falta dos líneas malas y no una: con una sola, la mediana la absorbe sin
+  # inmutarse, que es justamente para lo que se usa una mediana. El daño aparece cuando
+  # son bastantes dentro de la misma ventana, como pasó de verdad en octubre.
+  def cargar_burrata
+    5.times { |i| buy(name: "Burrata", on: TODAY - 300 + (i * 10), qty: 8, unit_total: 47_680) }
+    2.times { |i| buy(name: "Burrata", on: TODAY - 40 + (i * 5),   qty: 8, unit_total: 47_680) }
+    2.times { |i| buy(name: "Burrata", on: TODAY - 25 + (i * 5), qty: 16, unit_total: 47_680) } # eran 8
+  end
+
+  test "una cantidad mal cargada no manda en las medianas" do
+    cargar_burrata
+
+    con = IngredientPrices.new(period: "12", to: TODAY).rows.first
+    sin = IngredientPrices.new(period: "12", to: TODAY, typos: []).rows.first
+
+    assert_equal 5_960, con.recent_price, "la mediana reciente es el precio de verdad"
+    assert_operator sin.recent_price, :<, con.recent_price,
+                    "sin el filtro, la línea mal cargada hundía la mediana"
+  end
+
+  test "la plata de una línea mal cargada sigue contando en el gasto" do
+    cargar_burrata
+
+    row = IngredientPrices.new(period: "12", to: TODAY).rows.first
+
+    assert_equal 9 * 47_680, row.spend, "el monto es correcto: esa plata salió de la caja"
+    assert_equal 2, row.suspicious_count, "pero las líneas quedan listadas para corregirlas en Fudo"
+    assert_equal 7 * 8, row.quantity, "la cantidad mal cargada no suma: es la que miente"
+  end
+
+  test "el precio promedio no se infla al dejar fuera una cantidad mal cargada" do
+    cargar_burrata
+
+    row = IngredientPrices.new(period: "12", to: TODAY).rows.first
+
+    # 7 compras limpias de 8 unidades a $47.680: el promedio es el precio de siempre.
+    # Dividir el gasto entero (9 líneas) por la cantidad limpia (56) daría $7.663.
+    assert_in_delta 5_960, row.avg_price, 1
+  end
+
+  test "el gasto total nunca baja por marcar líneas: esa plata salió igual" do
+    cargar_burrata
+
+    con = IngredientPrices.new(period: "12", to: TODAY).total_spend
+    sin = IngredientPrices.new(period: "12", to: TODAY, typos: []).total_spend
+
+    assert_operator con, :>=, sin
+  end
 end

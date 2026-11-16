@@ -151,13 +151,32 @@ class IngredientPrices
 
   attr_reader :from, :to, :period_key
 
-  def initialize(period: "12", from: nil, to: nil)
+  # `typos` se puede inyectar para no recalcular QuantityTypos.all dos veces en la misma
+  # petición (la pantalla de insumos también lo necesita para el contador del botón).
+  def initialize(period: "12", from: nil, to: nil, typos: nil)
     @period_key = PERIODS.key?(period.to_s) ? period.to_s : "12"
-    @to   = to || IngredientPurchase.last_purchase_date || AppSettings.today
-    @from = from || default_from
+    @to     = to || IngredientPurchase.last_purchase_date || AppSettings.today
+    @from   = from || default_from
+    @typos  = typos
   end
 
   def rows = @rows ||= build_rows
+
+  def typos = @typos ||= QuantityTypos.all
+
+  # Ids de las líneas donde el monto cuadra con otra compra y la cantidad no.
+  #
+  # Se tratan como dudosas, igual que las que se salen de OUTLIER_FACTOR: no entran en
+  # ninguna mediana, pero siguen contándose en el gasto y listadas para corregirlas en
+  # Fudo. No se corrige nada aquí, solo se deja de usar como referencia de precio.
+  #
+  # Hacía falta porque el filtro de OUTLIER_FACTOR solo descarta lo que está más de 4
+  # veces fuera, y los errores de factor 2 pasan por debajo. La burrata: precio real
+  # $5.960/unidad, con 16 unidades cargadas donde eran 8 y 30 donde eran 15, o sea
+  # $2.980. Comparando el mes contra el anterior eso daba un "+100,0%" que nunca pasó, y
+  # era el mayor aportante a la canasta. Medido en producción, las 94 líneas marcadas le
+  # cambiaban el SIGNO a la canasta de 1 mes (+2,4% -> -0,3%) y a la de 3 (-2,8% -> +0,5%).
+  def typo_ids = @typo_ids ||= typos.map { |f| f.purchase.id }.to_set
 
   def any? = IngredientPurchase.exists?
 
@@ -342,24 +361,27 @@ class IngredientPrices
                       .filter_map { |id, list| build_row(id, list) }
   end
 
+  # Quita de una consulta las líneas con la cantidad mal cargada. Ver typo_ids.
+  def sin_errores(scope) = typo_ids.empty? ? scope : scope.where.not(id: typo_ids.to_a)
+
   # Precio "normal" de cada insumo: la mediana de un historial amplio, no la del
   # período elegido. Ver ANCHOR_DAYS.
   def anchor_medians
     @anchor_medians ||= begin
       desde = [@from, @to - ANCHOR_DAYS].min
-      IngredientPurchase.between(desde, @to)
-                        .pluck(:fudo_ingredient_id, :unit_price)
-                        .group_by(&:first)
-                        .transform_values { |pares| self.class.median(pares.map { |(_, precio)| precio.to_f }) }
+      sin_errores(IngredientPurchase.between(desde, @to))
+        .pluck(:fudo_ingredient_id, :unit_price)
+        .group_by(&:first)
+        .transform_values { |pares| self.class.median(pares.map { |(_, precio)| precio.to_f }) }
     end
   end
 
   # Precios del período anterior, por insumo. Solo hace falta en modo :previous.
   def previous_prices
-    @previous_prices ||= IngredientPurchase.between(previous_from, @from - 1)
-                                           .pluck(:fudo_ingredient_id, :unit_price)
-                                           .group_by(&:first)
-                                           .transform_values { |pares| pares.map { |(_, precio)| precio.to_f } }
+    @previous_prices ||= sin_errores(IngredientPurchase.between(previous_from, @from - 1))
+                         .pluck(:fudo_ingredient_id, :unit_price)
+                         .group_by(&:first)
+                         .transform_values { |pares| pares.map { |(_, precio)| precio.to_f } }
   end
 
   def build_row(ingredient_id, list)
@@ -368,13 +390,24 @@ class IngredientPrices
     median = anchor_medians[ingredient_id] || self.class.median(list.map { |p| p.unit_price.to_f })
     return nil if median.nil? || median.zero?
 
-    clean, suspicious = list.partition { |p| plausible?(p.unit_price.to_f, median) }
+    # Una línea sirve de referencia de precio si su precio es plausible Y su cantidad
+    # cuadra con la plata. Las demás van a `suspicious`, la lista para corregir en Fudo.
+    clean, suspicious = list.partition do |p|
+      plausible?(p.unit_price.to_f, median) && !typo_ids.include?(p.id)
+    end
     return nil if clean.empty?
 
-    prices = clean.map { |p| p.unit_price.to_f }
-    qty    = clean.sum { |p| p.quantity.to_f }
-    spend  = clean.sum { |p| p.line_total.to_f }
-    last   = clean.last
+    # Pero de las dudosas, las de cantidad mal cargada son un caso aparte: su MONTO sí es
+    # bueno, que es la premisa entera de QuantityTypos. Esa plata salió de la caja y tiene
+    # que seguir contando en el gasto —son $3,5M en el histórico, un 2,5% del total—; lo
+    # que no cuenta es su precio ni su cantidad, que son justamente las que mienten.
+    gasto = clean + suspicious.select { |p| typo_ids.include?(p.id) }
+
+    prices      = clean.map { |p| p.unit_price.to_f }
+    qty         = clean.sum { |p| p.quantity.to_f }
+    gasto_claro = clean.sum { |p| p.line_total.to_f }
+    spend       = gasto.sum { |p| p.line_total.to_f }
+    last        = clean.last
 
     if split?
       # Sin dos ventanas separadas no hay variación que medir (insumo nuevo o de compra única).
@@ -404,8 +437,10 @@ class IngredientPrices
       min_date:       clean[prices.index(prices.min)].purchased_on,
       max_price:      prices.max,
       max_date:       clean[prices.index(prices.max)].purchased_on,
-      # Promedio ponderado por cantidad: el precio que de verdad se pagó.
-      avg_price:      qty.positive? ? spend / qty : nil,
+      # Promedio ponderado por cantidad: el precio que de verdad se pagó. Usa solo las
+      # líneas limpias, porque dividir el gasto completo por una cantidad que no incluye
+      # las mal cargadas daría un precio inflado.
+      avg_price:      qty.positive? ? gasto_claro / qty : nil,
       quantity:       qty,
       spend:          spend,
       last_date:      last.purchased_on,
