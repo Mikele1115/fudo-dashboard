@@ -392,6 +392,17 @@ en la sincronización nocturna, así que el aviso llega **a la mañana siguiente
 El botón **Vista** de cada alerta la archiva para que deje de aparecer arriba; queda en
 el historial del insumo.
 
+**Quién recibe las alertas.** `MAIL_TO` más `PRICE_ALERTS_EXTRA_TO`, que es una lista
+aparte precisamente para no mezclar dos cosas distintas: `MAIL_TO` recibe también el
+informe diario con la facturación del local, y que alguien tenga que enterarse de que
+subió la mozzarella no significa que deba ver cuánto se vendió ayer. Se **suma** a
+`MAIL_TO` en vez de sustituirlo, para que nadie pueda quedarse fuera de sus propias
+alertas por editar mal una variable; las direcciones repetidas se descartan.
+
+Las dos variables son secretos de Kamal (`config/deploy.yml` → `env.secret`): los valores
+viven en `.env` y `.kamal/secrets`, que no se suben al repositorio. En `.env.example` van
+documentadas y vacías.
+
 ### Resumen semanal de compras
 
 Los **lunes a las 12:00** sale un correo con la **semana anterior completa, de lunes a

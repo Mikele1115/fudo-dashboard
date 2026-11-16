@@ -6,11 +6,14 @@ class PurchasesMailerTest < ActionMailer::TestCase
   setup do
     ENV["MAIL_TO"]   = "duena@example.com"
     ENV["MAIL_FROM"] = "informes@example.com"
+    # Vacío a propósito: el .env del desarrollador no puede decidir a quién escribe un test.
+    ENV["PRICE_ALERTS_EXTRA_TO"] = ""
   end
 
   teardown do
     ENV.delete("MAIL_TO")
     ENV.delete("MAIL_FROM")
+    ENV.delete("PRICE_ALERTS_EXTRA_TO")
   end
 
   def alert(suspect: false, name: "Mozzarella")
@@ -66,6 +69,38 @@ class PurchasesMailerTest < ActionMailer::TestCase
     assert_match "Un insumo subió de precio y una carga para revisar", correo.subject
     assert_match "Alerta de precios", correo.subject, "hay una subida real: no es solo revisar cargas"
     assert_match "126.000", correo.html_part.body.to_s, "el sobrecosto real se sigue sumando"
+  end
+
+  # ---------- quién recibe cada correo ----------
+
+  test "las alertas de precio van también a los destinatarios extra" do
+    ENV["PRICE_ALERTS_EXTRA_TO"] = "compras@example.com, bodega@example.com"
+    a = alert
+
+    correo = PurchasesMailer.price_alerts([a.id])
+
+    assert_equal %w[duena@example.com compras@example.com bodega@example.com], correo.to
+  end
+
+  test "los destinatarios extra NO reciben el informe de ventas ni el resumen semanal" do
+    ENV["PRICE_ALERTS_EXTRA_TO"] = "compras@example.com"
+    DailySale.create!(date: Date.new(2026, 11, 11), total: 1000, tickets: 10)
+
+    assert_equal ["duena@example.com"], PurchasesMailer.weekly(Date.new(2026, 11, 16)).to
+    assert_equal ["duena@example.com"], ReportMailer.daily(Date.new(2026, 11, 11)).to
+  end
+
+  test "sin destinatarios extra las alertas siguen yendo solo a MAIL_TO" do
+    a = alert
+
+    assert_equal ["duena@example.com"], PurchasesMailer.price_alerts([a.id]).to
+  end
+
+  test "un extra repetido en MAIL_TO no duplica el envío" do
+    ENV["PRICE_ALERTS_EXTRA_TO"] = "duena@example.com, compras@example.com"
+    a = alert
+
+    assert_equal %w[duena@example.com compras@example.com], PurchasesMailer.price_alerts([a.id]).to
   end
 
   test "el resumen semanal marca las cargas en vez de contarlas como sobrecosto" do

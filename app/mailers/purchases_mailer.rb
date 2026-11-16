@@ -37,8 +37,10 @@ class PurchasesMailer < ApplicationMailer
                PriceAlert.headline(@alerts)
              end
 
+    # price_alerts_to, no mail_to: las alertas pueden ir a quien compra sin que esa
+    # persona reciba además la facturación del informe diario. Ver AppSettings.
     mail(
-      to:      AppSettings.mail_to,
+      to:      AppSettings.price_alerts_to,
       from:    AppSettings.mail_from,
       subject: "[#{@name}] #{@alerts.all?(&:suspect?) ? 'Revisar cargas' : 'Alerta de precios'} — #{titulo}"
     )

@@ -16,7 +16,16 @@ module AppSettings
   # Primer día del histórico a descargar (todos los años que quieres comparar).
   def history_from    = Date.parse(env("HISTORY_FROM", "#{today.year - 1}-01-01"))
   def mail_from       = env("MAIL_FROM", "")
-  def mail_to         = env("MAIL_TO", "").split(",").map(&:strip).reject(&:empty?)
+  def mail_to         = lista("MAIL_TO")
+
+  # Destinatarios SOLO de las alertas de precio, además de MAIL_TO.
+  #
+  # Va aparte a propósito: MAIL_TO recibe también el informe diario de ventas, con la
+  # facturación del local. Que alguien tenga que enterarse de que subió la mozzarella no
+  # significa que deba ver cuánto se vendió ayer. Se suma a MAIL_TO en vez de sustituirlo
+  # para que nadie pueda quedarse fuera de sus propias alertas por editar mal una variable.
+  def price_alerts_extra_to = lista("PRICE_ALERTS_EXTRA_TO")
+  def price_alerts_to       = (mail_to + price_alerts_extra_to).uniq
 
   def fudo_missing = %w[FUDO_API_KEY FUDO_API_SECRET].select { |k| env(k).nil? }
   def mail_missing = %w[SMTP_HOST SMTP_PORT SMTP_USER SMTP_PASSWORD MAIL_FROM MAIL_TO].select { |k| env(k).nil? }
@@ -36,4 +45,7 @@ module AppSettings
     v = ENV[key].to_s.strip
     v.empty? ? default : v
   end
+
+  # Una variable con varias direcciones separadas por comas.
+  def lista(key) = env(key, "").split(",").map(&:strip).reject(&:empty?)
 end

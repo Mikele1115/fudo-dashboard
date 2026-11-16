@@ -22,7 +22,7 @@ class AlertNotifier
 
     PurchasesMailer.price_alerts(pending.map(&:id)).deliver_now
     PriceAlert.where(id: pending.map(&:id)).update_all(notified_at: Time.current)
-    @logger.info "AlertNotifier: avisadas #{pending.size} alertas a #{AppSettings.mail_to.join(', ')}"
+    @logger.info "AlertNotifier: avisadas #{pending.size} alertas a #{AppSettings.price_alerts_to.join(', ')}"
     pending
   end
 end
