@@ -96,6 +96,22 @@ class QuantityTyposTest < ActiveSupport::TestCase
     assert_nil QuantityTypos.twin_for(otra)
   end
 
+  test "entre varias gemelas posibles gana la más cercana en el tiempo" do
+    # El mismo monto coincide con dos compras normales: una de hace tres días y otra de
+    # hace año y medio, a un precio que ya no existe. Las dos prueban que la cantidad está
+    # mal, pero la vieja se lee como un sinsentido. Pasó con la Salsiccia del 11/11/2026.
+    vieja  = buy(name: "Salsiccia", qty: 3.1, total: 55_720, on: TODAY - 500)
+    4.times { buy(name: "Salsiccia", qty: 1.5, total: 26_961, on: TODAY - 400) }
+    4.times { buy(name: "Salsiccia", qty: 1.5, total: 26_961) }
+    cerca  = buy(name: "Salsiccia", qty: 2.8, total: 55_720)
+    mala   = buy(name: "Salsiccia", qty: 1.12, total: 55_720)
+
+    gemela = QuantityTypos.twin_for(mala)
+
+    assert_equal cerca.id, gemela&.id, "la prueba que vale es la compra de al lado"
+    assert_not_equal vieja.id, gemela&.id
+  end
+
   test "twin_for se calla cuando el precio de la línea no se desvía lo suficiente" do
     5.times { buy(name: "Prosciutto", qty: 4, total: 78_244) }
     casi = buy(name: "Prosciutto", qty: 4.4, total: 78_244) # -9%: variación normal

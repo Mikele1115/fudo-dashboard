@@ -109,7 +109,7 @@ class QuantityTypos
     return nil if normales.size < MIN_NORMAL
     return nil unless (purchase.unit_price.to_f - normal).abs / normal >= PRICE_TOL
 
-    normales.find do |n|
+    cercanas_a(purchase, normales).find do |n|
       cerca?(n.line_total.to_f, monto, MONEY_TOL) &&
         !cerca?(purchase.quantity.to_f, n.quantity.to_f, QTY_TOL)
     end
@@ -159,15 +159,32 @@ class QuantityTypos
   end
 
   # La compra normal cuyo monto coincide con el de esta línea, con otra cantidad.
+  # Se prueban por cercanía en el tiempo: ver cercanas_a.
   def gemela_de(linea, normales, frecuentes)
     monto = linea.line_total.to_f
     return nil if monto.zero?
 
-    normales.find do |n|
+    cercanas_a(linea, normales).find do |n|
       cerca?(n.line_total.to_f, monto, MONEY_TOL) &&
         frecuentes.include?(n.quantity.to_f.round(4)) &&
         !cerca?(linea.quantity.to_f, n.quantity.to_f, QTY_TOL)
     end
+  end
+
+  # Ordena las candidatas por cercanía en el tiempo a la línea sospechosa.
+  #
+  # Importa porque 85 de las 90 líneas marcadas tienen más de una compra que coincide en
+  # el monto, y hay que elegir cuál se enseña. "La más antigua" (lo que salía por el orden
+  # de la consulta) le daba a la Salsiccia del 11/11/2026 una gemela de agosto de 2024, a
+  # un precio que ya no existe, cuando al lado estaba la del 21/10/2026. "La más reciente"
+  # tampoco sirve: las líneas marcadas van de 2023 a 2026, y para una de agosto de 2025 la
+  # más reciente puede estar un año DESPUÉS. La de al lado es la que se compró al mismo
+  # precio, y es la única que se lee sin tener que explicarla.
+  #
+  # Cambia la cantidad sugerida en 4 de las 90; en las otras 86 todas las gemelas traen la
+  # misma cantidad —el formato del proveedor— y da igual cuál se elija.
+  def cercanas_a(linea, candidatas)
+    candidatas.sort_by { |n| [(n.purchased_on - linea.purchased_on).to_i.abs, n.id] }
   end
 
   def cerca?(valor, referencia, tolerancia)
