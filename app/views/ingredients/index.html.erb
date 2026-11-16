@@ -3,9 +3,13 @@
 <section class="page-head">
   <div>
     <h1>Insumos</h1>
-    <p class="muted">
-      Comportamiento de los precios de compra entre el <%= a.from.strftime("%d/%m/%Y") %> y el <%= a.to.strftime("%d/%m/%Y") %>.
-      Precios netos, sin IVA. Las variaciones comparan los primeros <%= a.window_days %> días del período con los últimos <%= a.window_days %>.
+    <%# El período es el dato que hay que ver de un vistazo: va destacado y solo.
+        La letra chica explica cómo se calcula, que se lee una vez y no cada día. %>
+    <p class="period">
+      <%= a.from.strftime("%d/%m/%Y") %><span class="period__sep">→</span><%= a.to.strftime("%d/%m/%Y") %>
+    </p>
+    <p class="muted small">
+      Precios netos, sin IVA · variaciones: primeros <%= a.window_days %> días contra los últimos <%= a.window_days %>
     </p>
   </div>
   <%# Ojo: el botón de actualizar va FUERA del formulario del período.
