@@ -324,13 +324,12 @@
 
 <section class="card">
   <div class="card--actions">
-    <div>
-      <h2>Todos los insumos</h2>
-      <p class="muted small">Haz clic en un insumo para ver todas sus compras y la evolución de su precio.</p>
-    </div>
+    <h2>Buscar un insumo</h2>
     <form method="get" action="<%= ingredients_path %>" class="toolbar">
       <%= hidden_field_tag :period, a.period_key %>
-      <input type="search" name="q" value="<%= @query %>" placeholder="Buscar insumo…">
+      <%= hidden_field_tag :all, "1" if @show_all %>
+      <input type="search" name="q" value="<%= @query %>" placeholder="Buscar insumo…"
+             autocomplete="off" aria-label="Buscar insumo">
       <select name="sort" onchange="this.form.requestSubmit()">
         <option value="rise"   <%= "selected" if @sort == "rise" %>>Mayor subida</option>
         <option value="drop"   <%= "selected" if @sort == "drop" %>>Mayor bajada</option>
@@ -339,9 +338,37 @@
         <option value="recent" <%= "selected" if @sort == "recent" %>>Compra más reciente</option>
         <option value="name"   <%= "selected" if @sort == "name" %>>Nombre</option>
       </select>
-      <button class="btn btn--light">Filtrar</button>
+      <button class="btn btn--light">Buscar</button>
     </form>
   </div>
+
+<%# La tabla entera son 121 filas y casi nunca se quieren todas: se busca UNO. Así que
+    por defecto no se dibuja ninguna, y aparecen solo las que coinciden con la búsqueda.
+    El listado completo sigue a un clic, con ?all=1, para cuando se quiera repasar. %>
+<% if @query.blank? && !@show_all %>
+  <p class="muted">
+    Escribe el nombre de un insumo para ver su precio actual, cómo viene evolucionando y sus compras.
+    <%= link_to "Ver los #{int(a.ingredients_count)} insumos",
+                ingredients_path(period: a.period_key, sort: @sort, all: 1) %>
+  </p>
+<% elsif @rows.empty? %>
+  <p class="muted">
+    Ningún insumo coincide con «<%= @query %>» en <%= a.period_label.downcase %>.
+    <%= link_to "Ver todos", ingredients_path(period: a.period_key, sort: @sort, all: 1) %>
+    · <%= link_to "Probar con todo el histórico", ingredients_path(period: "all", sort: @sort, q: @query) %>
+  </p>
+<% else %>
+  <p class="muted small">
+    <% if @query.present? %>
+      <%= int(@rows.size) %> de <%= int(a.ingredients_count) %> insumos
+      <%= @rows.size == 1 ? "coincide" : "coinciden" %> con «<%= @query %>».
+      <%= link_to "Limpiar", ingredients_path(period: a.period_key, sort: @sort) %>
+    <% else %>
+      Los <%= int(a.ingredients_count) %> insumos del período.
+      <%= link_to "Volver al buscador", ingredients_path(period: a.period_key, sort: @sort) %>
+    <% end %>
+    · Haz clic en uno para ver todas sus compras y la evolución de su precio.
+  </p>
 
   <table class="table table--rows">
     <thead>
@@ -377,11 +404,9 @@
           <td class="muted small"><%= r.last_date.strftime("%d/%m/%y") %></td>
         </tr>
       <% end %>
-      <% if @rows.empty? %>
-        <tr><td colspan="9" class="muted">No hay insumos que coincidan con la búsqueda.</td></tr>
-      <% end %>
     </tbody>
   </table>
+<% end %>
 </section>
 
 <% if a.to_review.any? %>

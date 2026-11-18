@@ -10,6 +10,9 @@ class IngredientsController < ApplicationController
     @prices = IngredientPrices.new(period: params[:period], typos: typos)
     @sort   = params[:sort].presence || "rise"
     @query  = params[:q].to_s.strip
+    # La tabla de insumos no se dibuja entera por defecto: casi siempre se busca uno.
+    # Con ?all=1 se pide el listado completo a propósito. Ver la vista.
+    @show_all = params[:all].present?
     @rows   = @prices.sorted(@sort)
     @rows   = @rows.select { |r| r.name.to_s.downcase.include?(@query.downcase) } if @query.present?
     @typos  = typos.size

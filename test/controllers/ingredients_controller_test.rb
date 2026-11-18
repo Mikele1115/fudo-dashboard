@@ -77,6 +77,63 @@ class IngredientsControllerTest < ActionDispatch::IntegrationTest
     assert_not_includes etiquetas, "Insumos"
   end
 
+  # ---------- buscador de insumos ----------
+
+  def catalogo
+    %w[Mozzarella Harina Prosciutto].each_with_index do |nombre, i|
+      6.times { |j| buy(name: nombre, qty: 10, total: 60_000, on: HOY - (j * 10), ingredient_id: i + 1) }
+    end
+  end
+
+  def filas_del_buscador
+    seccion = css_select("section.card").find { |s| s.text.include?("Buscar un insumo") }
+    seccion.css("table.table--rows tbody tr").size
+  end
+
+  test "sin búsqueda no se dibuja la tabla entera, solo el buscador" do
+    catalogo
+
+    get ingredients_path
+
+    assert_response :success
+    assert_equal 0, filas_del_buscador, "la tabla de 121 filas no se dibuja de entrada"
+    assert_select "h2", text: "Buscar un insumo"
+    assert_match "Escribe el nombre de un insumo", response.body
+  end
+
+  test "buscar deja solo los insumos que coinciden" do
+    catalogo
+
+    get ingredients_path(q: "pro")
+
+    assert_equal 1, filas_del_buscador
+    assert_match "1 de 3 insumos", response.body
+    # Solo se filtra esta sección: "Por categoría" sigue listando todo, como debe.
+    tabla = css_select("section.card").find { |s| s.text.include?("Buscar un insumo") }
+                                      .css("table.table--rows").to_html
+    assert_match "Prosciutto", tabla
+    assert_no_match(/Mozzarella/, tabla)
+  end
+
+  test "una búsqueda sin resultados lo dice y ofrece salidas" do
+    catalogo
+
+    get ingredients_path(q: "trufa blanca")
+
+    assert_equal 0, filas_del_buscador
+    assert_match "Ningún insumo coincide", response.body
+    assert_select "a", text: "Ver todos"
+  end
+
+  test "con all=1 se puede ver el listado completo" do
+    catalogo
+
+    get ingredients_path(all: 1)
+
+    assert_equal 3, filas_del_buscador
+    assert_match "Volver al buscador", response.body
+  end
+
   test "el cuadro del gasto enseña el desglose por categoría" do
     6.times { |i| buy(name: "Mozzarella", qty: 10, total: 60_000, on: HOY - (i * 5)) }
 
