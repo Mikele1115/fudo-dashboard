@@ -105,9 +105,11 @@
     </form>
   </div>
 
-  <p class="muted" data-filtro-target="prompt" <%= "hidden" if visibles.any? || @query.present? %>>
-    Escribe el nombre de un insumo para ver su precio actual, cómo viene evolucionando y sus compras.
-    <%= link_to "Ver los #{int(a.ingredients_count)} insumos",
+  <%# Corto a propósito: lo que la tabla enseña ya se ve en cuanto hay resultados, y el
+      párrafo estaba más tiempo en pantalla que la propia tabla. %>
+  <p class="muted small" data-filtro-target="prompt" <%= "hidden" if visibles.any? || @query.present? %>>
+    Escribe el nombre de un insumo.
+    <%= link_to "Ver los #{int(a.ingredients_count)}",
                 ingredients_path(period: a.period_key, sort: @sort, all: 1) %>
   </p>
 
