@@ -1,0 +1,22 @@
+<%# Lista corta de días, ordenada por la medida que la llama. `medida` decide qué
+    número se destaca: :total (venta del día) o :avg_ticket (ticket promedio). %>
+<% if rows.empty? %>
+  <p class="muted small">Sin días con venta.</p>
+<% else %>
+  <table class="table table--compact">
+    <tbody>
+      <% rows.each do |row| %>
+        <tr>
+          <td><%= link_to short_date(row.date), root_path(date: row.date) %></td>
+          <% if medida == :avg_ticket %>
+            <td class="num"><%= money(row.day.avg_ticket) %></td>
+            <td class="num muted"><%= int(row.day.tickets) %> tickets</td>
+          <% else %>
+            <td class="num"><%= money(row.day.total) %></td>
+            <td class="num muted"><%= int(row.day.tickets) %> tickets</td>
+          <% end %>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>

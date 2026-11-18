@@ -1,0 +1,39 @@
+<%# El mes repartido por día de la semana. `columna` elige qué se compara:
+    :venta (contra el año anterior) o :tickets. %>
+<% dias = report.by_weekday %>
+<% if dias.empty? %>
+  <p class="muted">Todavía no hay días con venta en este mes.</p>
+<% else %>
+  <table class="table table--compact">
+    <thead>
+      <tr>
+        <th>Día</th>
+        <th class="num">Días</th>
+        <% if columna == :tickets %>
+          <th class="num">Tickets</th><th class="num">Por día</th><th class="num">Ticket prom.</th>
+        <% else %>
+          <th class="num">Venta</th><th class="num">Por día</th>
+          <th class="num">Año anterior</th><th class="num">Variación</th>
+        <% end %>
+      </tr>
+    </thead>
+    <tbody>
+      <% dias.sort_by { |d| -(columna == :tickets ? d.tickets : d.total) }.each do |d| %>
+        <tr>
+          <td><%= d.name %></td>
+          <td class="num muted"><%= int(d.days) %></td>
+          <% if columna == :tickets %>
+            <td class="num"><%= int(d.tickets) %></td>
+            <td class="num muted"><%= int(d.days.positive? ? d.tickets / d.days : 0) %></td>
+            <td class="num muted"><%= money(d.avg_ticket) %></td>
+          <% else %>
+            <td class="num"><%= money(d.total) %></td>
+            <td class="num muted"><%= money(d.avg_total) %></td>
+            <td class="num muted"><%= money(d.ly_total) %></td>
+            <td class="num"><%= pct_badge(d.total, d.ly_total.positive? ? d.ly_total : nil) %></td>
+          <% end %>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>

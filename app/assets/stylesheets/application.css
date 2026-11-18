@@ -70,7 +70,7 @@ code { background: #eef0f3; padding: 1px 5px; border-radius: 4px; font-size: 12p
 .datepicker { display: flex; align-items: center; gap: 6px; }
 .datepicker input { padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font: inherit; background: #fff; }
 
-.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; align-items: start; }
 .kpi { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; }
 .kpi__label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
 .kpi__value { font-size: 28px; font-weight: 600; margin: 4px 0 2px; font-variant-numeric: tabular-nums; }
@@ -116,7 +116,7 @@ code { background: #eef0f3; padding: 1px 5px; border-radius: 4px; font-size: 12p
 @media (max-width: 600px)  { .kpis--6 { grid-template-columns: repeat(2, 1fr); } }
 
 /* Fila de 5 indicadores */
-.kpis--5 { grid-template-columns: repeat(5, 1fr); align-items: start; }
+.kpis--5 { grid-template-columns: repeat(5, 1fr); }
 .kpis--5 .kpi__value { font-size: 22px; }
 @media (max-width: 1100px) { .kpis--5 { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 600px)  { .kpis--5 { grid-template-columns: repeat(2, 1fr); } }

@@ -23,36 +23,93 @@
 </section>
 
 <section class="kpis kpis--6">
-  <div class="kpi">
-    <div class="kpi__label">Ventas del mes</div>
-    <div class="kpi__value"><%= money(p.total) %></div>
-    <div class="kpi__delta"><%= pct_badge(p.total, lp.total) %> <span class="muted">vs. <%= money(lp.total) %> en <%= r.year - 1 %></span></div>
-  </div>
-  <div class="kpi">
-    <div class="kpi__label">Venta neta (sin IVA)</div>
-    <div class="kpi__value"><%= money(p.net) %></div>
-    <div class="kpi__delta"><%= pct_badge(p.net, lp.net) %> <span class="muted">vs. <%= money(lp.net) %></span></div>
-  </div>
-  <div class="kpi">
-    <div class="kpi__label">Tickets</div>
-    <div class="kpi__value"><%= int(p.tickets) %></div>
-    <div class="kpi__delta"><%= pct_badge(p.tickets, lp.tickets) %> <span class="muted">vs. <%= int(lp.tickets) %></span></div>
-  </div>
-  <div class="kpi">
-    <div class="kpi__label">Ticket promedio</div>
-    <div class="kpi__value"><%= money(p.avg_ticket) %></div>
-    <div class="kpi__delta"><%= pct_badge(p.avg_ticket, lp.avg_ticket) %> <span class="muted">vs. <%= money(lp.avg_ticket) %></span></div>
-  </div>
-  <div class="kpi">
-    <div class="kpi__label">Ticket por persona</div>
-    <div class="kpi__value"><%= money(p.avg_per_person) %></div>
-    <div class="kpi__delta"><%= pct_badge(p.avg_per_person, lp.avg_per_person) %> <span class="muted"><%= int(p.people) %> comensales</span></div>
-  </div>
-  <div class="kpi">
-    <div class="kpi__label">Venta promedio por día</div>
-    <div class="kpi__value"><%= money(p.days.positive? ? p.total / p.days : nil) %></div>
-    <div class="kpi__delta"><span class="muted"><%= p.days %> días con venta de <%= r.rows.size %></span></div>
-  </div>
+  <%= render layout: "shared/kpi", locals: {
+        label: "Ventas del mes", value: money(p.total),
+        delta: safe_join([pct_badge(p.total, lp.total), " vs. #{money(lp.total)} en #{r.year - 1}"]),
+        hint:  "De qué días vive el mes. El día a día de abajo no deja ver que un sábado vale por dos martes." } do %>
+    <%= render "history/weekdays", report: r, columna: :venta %>
+  <% end %>
+
+  <%= render layout: "shared/kpi", locals: {
+        label: "Venta neta (sin IVA)", value: money(p.net),
+        delta: safe_join([pct_badge(p.net, lp.net), " vs. #{money(lp.net)}"]),
+        hint:  "Qué hay dentro de lo cobrado." } do %>
+    <table class="table table--compact">
+      <tbody>
+        <tr><td>Venta bruta</td><td class="num"><%= money(p.total) %></td></tr>
+        <tr><td>IVA incluido (<%= (AppSettings.vat_rate * 100).round %>%)</td>
+            <td class="num muted">−<%= money(p.total - p.net) %></td></tr>
+        <tr><td><strong>Venta neta</strong></td><td class="num"><strong><%= money(p.net) %></strong></td></tr>
+        <tr><td class="muted">Propinas <span class="small">(aparte, no van en la venta)</span></td>
+            <td class="num muted"><%= money(p.tips) %></td></tr>
+      </tbody>
+    </table>
+  <% end %>
+
+  <%= render layout: "shared/kpi", locals: {
+        label: "Tickets", value: int(p.tickets),
+        delta: safe_join([pct_badge(p.tickets, lp.tickets), " vs. #{int(lp.tickets)}"]),
+        hint:  "Cuántas mesas y pedidos entran cada día de la semana." } do %>
+    <%= render "history/weekdays", report: r, columna: :tickets %>
+  <% end %>
+
+  <%= render layout: "shared/kpi", locals: {
+        label: "Ticket promedio", value: money(p.avg_ticket),
+        delta: safe_join([pct_badge(p.avg_ticket, lp.avg_ticket), " vs. #{money(lp.avg_ticket)}"]),
+        hint:  "Qué días tiran del promedio hacia arriba y cuáles hacia abajo." } do %>
+    <div class="grid-2">
+      <div>
+        <h3 class="kpi__subtitle">Ticket más alto</h3>
+        <%= render "history/day_list", rows: r.top_days(5, by: :avg_ticket), medida: :avg_ticket %>
+      </div>
+      <div>
+        <h3 class="kpi__subtitle">Ticket más bajo</h3>
+        <%= render "history/day_list", rows: r.bottom_days(5, by: :avg_ticket), medida: :avg_ticket %>
+      </div>
+    </div>
+  <% end %>
+
+  <%= render layout: "shared/kpi", locals: {
+        label: "Ticket por persona", value: money(p.avg_per_person),
+        delta: content_tag(:span, "#{int(p.people)} comensales", class: "muted"),
+        hint:  "No es la venta del mes dividida entre los comensales: solo cuentan las ventas de salón donde se registró cuánta gente había." } do %>
+    <table class="table table--compact">
+      <tbody>
+        <tr><td>Venta con comensales registrados</td><td class="num"><%= money(p.people_sales) %></td></tr>
+        <tr><td class="muted">Resto del mes <span class="small">(delivery y retiro)</span></td>
+            <td class="num muted"><%= money(r.sales_without_people) %></td></tr>
+        <tr><td>Comensales</td><td class="num"><%= int(p.people) %></td></tr>
+        <tr><td><strong>Ticket por persona</strong></td>
+            <td class="num"><strong><%= money(p.avg_per_person) %></strong></td></tr>
+      </tbody>
+    </table>
+    <p class="muted small">
+      Dividir toda la venta del mes entre los comensales daría
+      <%= money(p.people.positive? ? p.total / p.people : nil) %>, que no es lo que gasta nadie.
+    </p>
+  <% end %>
+
+  <%= render layout: "shared/kpi", locals: {
+        label: "Venta promedio por día",
+        value: money(p.days.positive? ? p.total / p.days : nil),
+        delta: content_tag(:span, "#{p.days} días con venta de #{r.rows.size}", class: "muted"),
+        hint:  "El promedio solo cuenta los días con venta: un día cerrado no baja la media." } do %>
+    <div class="grid-2">
+      <div>
+        <h3 class="kpi__subtitle">Mejores días</h3>
+        <%= render "history/day_list", rows: r.top_days(5), medida: :total %>
+      </div>
+      <div>
+        <h3 class="kpi__subtitle">Peores días</h3>
+        <%= render "history/day_list", rows: r.bottom_days(5), medida: :total %>
+      </div>
+    </div>
+    <% if r.closed_days.any? %>
+      <p class="muted small">
+        Sin venta: <%= r.closed_days.map { |d| short_date(d.date) }.join(" · ") %>
+      </p>
+    <% end %>
+  <% end %>
 </section>
 
 <section class="card">
