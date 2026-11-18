@@ -10,11 +10,14 @@ class IngredientsController < ApplicationController
     @prices = IngredientPrices.new(period: params[:period], typos: typos)
     @sort   = params[:sort].presence || "rise"
     @query  = params[:q].to_s.strip
-    # La tabla de insumos no se dibuja entera por defecto: casi siempre se busca uno.
-    # Con ?all=1 se pide el listado completo a propósito. Ver la vista.
+    # La tabla no se dibuja entera por defecto: casi siempre se busca uno. Con ?all=1 se
+    # pide el listado completo a propósito.
+    #
+    # Las filas se mandan TODAS y el filtrado lo hace filtro_controller.js mientras se
+    # escribe. La vista marca cuáles coinciden con ?q= para que un enlace con búsqueda
+    # funcione aunque el JS no cargue; el controlador recalcula lo mismo al arrancar.
     @show_all = params[:all].present?
-    @rows   = @prices.sorted(@sort)
-    @rows   = @rows.select { |r| r.name.to_s.downcase.include?(@query.downcase) } if @query.present?
+    @rows     = @prices.sorted(@sort)
     @typos  = typos.size
   end
 

@@ -74,15 +74,26 @@
   </section>
 <% end %>
 
-<section class="card">
+<%# El filtrado ocurre en el navegador mientras se escribe (filtro_controller.js): las
+    filas van todas en el HTML y se muestran u ocultan ahí. Aquí se pinta el estado
+    inicial —el mismo que calcularía el JS— para que un enlace con ?q= funcione aunque
+    el JS no cargue y para que no haya parpadeo al arrancar. %>
+<% busqueda    = sin_acentos(@query) %>
+<% coincidentes = @query.present? ? @rows.select { |r| sin_acentos(r.name).include?(busqueda) } : [] %>
+<% visibles    = @query.present? ? coincidentes : (@show_all ? @rows : []) %>
+<section class="card" data-controller="filtro"
+         data-filtro-total-value="<%= a.ingredients_count %>"
+         data-filtro-show-all-when-empty-value="<%= @show_all %>">
   <div class="card--actions">
     <h2>Buscar un insumo</h2>
-    <form method="get" action="<%= ingredients_path %>" class="toolbar">
+    <form method="get" action="<%= ingredients_path %>" class="toolbar"
+          data-action="submit->filtro#prevent">
       <%= hidden_field_tag :period, a.period_key %>
       <%= hidden_field_tag :all, "1" if @show_all %>
       <input type="search" name="q" value="<%= @query %>" placeholder="Buscar insumo…"
-             autocomplete="off" aria-label="Buscar insumo">
-      <select name="sort" onchange="this.form.requestSubmit()">
+             autocomplete="off" aria-label="Buscar insumo"
+             data-filtro-target="input" data-action="input->filtro#filter search->filtro#filter">
+      <select name="sort" onchange="this.form.submit()">
         <option value="rise"   <%= "selected" if @sort == "rise" %>>Mayor subida</option>
         <option value="drop"   <%= "selected" if @sort == "drop" %>>Mayor bajada</option>
         <option value="impact" <%= "selected" if @sort == "impact" %>>Impacto en pesos</option>
@@ -90,39 +101,43 @@
         <option value="recent" <%= "selected" if @sort == "recent" %>>Compra más reciente</option>
         <option value="name"   <%= "selected" if @sort == "name" %>>Nombre</option>
       </select>
-      <button class="btn btn--light">Buscar</button>
+      <noscript><button class="btn btn--light">Buscar</button></noscript>
     </form>
   </div>
 
-<%# La tabla entera son 121 filas y casi nunca se quieren todas: se busca UNO. Así que
-    por defecto no se dibuja ninguna, y aparecen solo las que coinciden con la búsqueda.
-    El listado completo sigue a un clic, con ?all=1, para cuando se quiera repasar. %>
-<% if @query.blank? && !@show_all %>
-  <p class="muted">
+  <p class="muted" data-filtro-target="prompt" <%= "hidden" if visibles.any? || @query.present? %>>
     Escribe el nombre de un insumo para ver su precio actual, cómo viene evolucionando y sus compras.
     <%= link_to "Ver los #{int(a.ingredients_count)} insumos",
                 ingredients_path(period: a.period_key, sort: @sort, all: 1) %>
   </p>
-<% elsif @rows.empty? %>
-  <p class="muted">
-    Ningún insumo coincide con «<%= @query %>» en <%= a.period_label.downcase %>.
+
+  <p class="muted" data-filtro-target="empty" <%= "hidden" unless @query.present? && coincidentes.empty? %>>
+    Ningún insumo coincide con «<span data-filtro-target="query"><%= @query %></span>» en <%= a.period_label.downcase %>.
     <%= link_to "Ver todos", ingredients_path(period: a.period_key, sort: @sort, all: 1) %>
-    · <%= link_to "Probar con todo el histórico", ingredients_path(period: "all", sort: @sort, q: @query) %>
-  </p>
-<% else %>
-  <p class="muted small">
-    <% if @query.present? %>
-      <%= int(@rows.size) %> de <%= int(a.ingredients_count) %> insumos
-      <%= @rows.size == 1 ? "coincide" : "coinciden" %> con «<%= @query %>».
-      <%= link_to "Limpiar", ingredients_path(period: a.period_key, sort: @sort) %>
-    <% else %>
-      Los <%= int(a.ingredients_count) %> insumos del período.
-      <%= link_to "Volver al buscador", ingredients_path(period: a.period_key, sort: @sort) %>
-    <% end %>
-    · Haz clic en uno para ver todas sus compras y la evolución de su precio.
+    · <%= link_to "Probar con todo el histórico",
+                  ingredients_path(period: "all", sort: @sort, q: @query),
+                  data: { filtro_target: "histLink" } %>
   </p>
 
-  <table class="table table--rows">
+  <p class="muted small" data-filtro-target="status" aria-live="polite" <%= "hidden" if visibles.empty? %>>
+    <% if @query.present? %>
+      <%= int(coincidentes.size) %> de <%= int(a.ingredients_count) %> insumos
+      <%= coincidentes.size == 1 ? "coincide" : "coinciden" %> con «<%= @query %>».
+    <% else %>
+      Los <%= int(a.ingredients_count) %> insumos del período.
+    <% end %>
+    Haz clic en uno para ver todas sus compras y la evolución de su precio.
+  </p>
+
+  <%# Fuera del párrafo de estado a propósito: el JS reescribe ese texto al filtrar y se
+      llevaría el enlace por delante. %>
+  <% if @show_all %>
+    <p class="small">
+      <%= link_to "Volver al buscador", ingredients_path(period: a.period_key, sort: @sort) %>
+    </p>
+  <% end %>
+
+  <table class="table table--rows" data-filtro-target="table" <%= "hidden" if visibles.empty? %>>
     <thead>
       <tr>
         <th>Insumo</th>
@@ -138,7 +153,8 @@
     </thead>
     <tbody>
       <% @rows.each do |r| %>
-        <tr>
+        <tr data-filtro-target="row" data-nombre="<%= sin_acentos(r.name) %>"
+            <%= "hidden" unless visibles.include?(r) %>>
           <td>
             <%= link_to r.name, ingredient_path(r.ingredient_id, period: a.period_key) %>
             <span class="muted small">/ <%= r.unit_label %></span>
@@ -158,7 +174,6 @@
       <% end %>
     </tbody>
   </table>
-<% end %>
 </section>
 
 <%# Cada cuadro se abre y enseña de dónde sale su número. Ver _kpi.html.erb. %>

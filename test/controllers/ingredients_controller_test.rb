@@ -85,9 +85,14 @@ class IngredientsControllerTest < ActionDispatch::IntegrationTest
     end
   end
 
+  def seccion_buscador
+    css_select("section.card").find { |s| s.text.include?("Buscar un insumo") }
+  end
+
+  # Las filas van TODAS en el HTML para que el filtrado sea instantáneo en el navegador;
+  # lo que cambia es cuáles están ocultas. Así que se cuentan las visibles, no las que hay.
   def filas_del_buscador
-    seccion = css_select("section.card").find { |s| s.text.include?("Buscar un insumo") }
-    seccion.css("table.table--rows tbody tr").size
+    seccion_buscador.css("table.table--rows tbody tr").reject { |tr| tr.attributes.key?("hidden") }.size
   end
 
   test "sin búsqueda no se dibuja la tabla entera, solo el buscador" do
@@ -96,9 +101,53 @@ class IngredientsControllerTest < ActionDispatch::IntegrationTest
     get ingredients_path
 
     assert_response :success
-    assert_equal 0, filas_del_buscador, "la tabla de 121 filas no se dibuja de entrada"
+    assert_equal 0, filas_del_buscador, "sin escribir nada no se enseña ninguna fila"
     assert_select "h2", text: "Buscar un insumo"
     assert_match "Escribe el nombre de un insumo", response.body
+  end
+
+  test "las filas van en el HTML para que el filtrado sea instantáneo" do
+    catalogo
+
+    get ingredients_path
+
+    filas = seccion_buscador.css("table.table--rows tbody tr")
+    assert_equal 3, filas.size, "están todas, solo que ocultas"
+    assert_equal %w[prosciutto harina mozzarella].sort, filas.map { |tr| tr["data-nombre"] }.sort,
+                 "cada fila lleva su nombre normalizado para buscar sin tildes ni mayúsculas"
+    assert_select "[data-controller=filtro]"
+  end
+
+  # Un target mal escrito en la plantilla no rompe nada: el filtro simplemente deja de
+  # funcionar, en silencio. Esto cruza el HTML con lo que el controlador declara.
+  test "el HTML trae los targets y las acciones que espera el controlador de JS" do
+    catalogo
+
+    get ingredients_path
+
+    fuente     = File.read(Rails.root.join("app/javascript/controllers/filtro_controller.js"))
+    declarados = fuente[/static targets = \[(.*?)\]/m, 1].to_s.scan(/"(\w+)"/).flatten
+    # Los que el JS consulta con hasXTarget son opcionales; el resto tienen que estar.
+    opcionales = fuente.scan(/has(\w+)Target/).flatten.map { |n| n[0].downcase + n[1..] }
+
+    assert_operator declarados.size, :>=, 5, "¿seguro que se leyeron los targets?"
+    (declarados - opcionales).each do |t|
+      assert_select "[data-filtro-target=?]", t, { minimum: 1 }, "falta el target «#{t}» en el HTML"
+    end
+
+    acciones = response.body.scan(/->filtro#(\w+)/).flatten.uniq
+    assert_includes acciones, "filter"
+    acciones.each do |metodo|
+      assert_match(/^\s+#{metodo}\s*\(/, fuente, "el HTML llama a filtro##{metodo} y el controlador no lo tiene")
+    end
+  end
+
+  test "la búsqueda ignora tildes y mayúsculas" do
+    6.times { |j| buy(name: "Jamón Serrano", qty: 1, total: 9_000, on: HOY - (j * 10)) }
+
+    get ingredients_path(q: "JAMON")
+
+    assert_equal 1, filas_del_buscador, "«JAMON» tiene que encontrar «Jamón Serrano»"
   end
 
   test "el buscador va arriba, justo debajo de las alertas y antes de los cuadros" do
@@ -120,11 +169,10 @@ class IngredientsControllerTest < ActionDispatch::IntegrationTest
 
     assert_equal 1, filas_del_buscador
     assert_match "1 de 3 insumos", response.body
-    # Solo se filtra esta sección: "Por categoría" sigue listando todo, como debe.
-    tabla = css_select("section.card").find { |s| s.text.include?("Buscar un insumo") }
-                                      .css("table.table--rows").to_html
-    assert_match "Prosciutto", tabla
-    assert_no_match(/Mozzarella/, tabla)
+    visible = seccion_buscador.css("table.table--rows tbody tr")
+                              .reject { |tr| tr.attributes.key?("hidden") }.map(&:to_html).join
+    assert_match "Prosciutto", visible
+    assert_no_match(/Mozzarella/, visible)
   end
 
   test "una búsqueda sin resultados lo dice y ofrece salidas" do

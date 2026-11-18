@@ -98,6 +98,12 @@ module IngredientsHelper
     money(alert.overcost)
   end
 
+  # Sin mayúsculas ni tildes, para buscar: "jamon" tiene que encontrar "Jamón".
+  # El mismo criterio que usa filtro_controller.js en el navegador.
+  def sin_acentos(texto)
+    texto.to_s.unicode_normalize(:nfd).gsub(/\p{Mn}/, "").downcase.strip
+  end
+
   # "a mano" / "por regla" / "—": de dónde salió la categoría de un insumo.
   def assignment_origin(ingredient_id)
     a = IngredientAssignment.find_by(fudo_ingredient_id: ingredient_id)
