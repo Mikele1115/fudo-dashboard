@@ -74,49 +74,143 @@
   </section>
 <% end %>
 
-<section class="kpis kpis--6">
-  <div class="kpi">
-    <div class="kpi__label">Gasto en insumos</div>
-    <div class="kpi__value"><%= money(a.total_spend) %></div>
-    <div class="kpi__delta muted"><%= a.period_label.downcase %>, sin IVA</div>
-  </div>
-  <div class="kpi">
-    <div class="kpi__label">La canasta</div>
-    <div class="kpi__value">
-      <% if a.basket_change_pct %>
-        <span class="<%= a.basket_change_pct.positive? ? 'txt--bad' : 'txt--good' %>"><%= pct_text(a.basket_change_pct + 100, 100) %></span>
-      <% else %>—<% end %>
-    </div>
-    <div class="kpi__delta muted">
-      ponderada por gasto, sobre <%= int(a.reliable_rows.size) %> insumos
-      <% if a.unreliable_count.positive? %>
-        <span title="Quedan fuera las variaciones con menos de <%= IngredientPrices::MIN_CONFIDENCE %> compras en algún extremo: un insumo con dos compras no debe mover el índice">
-          (<%= int(a.unreliable_count) %> fuera por pocos datos)
-        </span>
-      <% end %>
-    </div>
-  </div>
+<%# Cada cuadro se abre y enseña de dónde sale su número. Ver _kpi.html.erb. %>
+<section class="kpis kpis--5">
+  <%= render layout: "kpi", locals: {
+        label: "Gasto en insumos", value: money(a.total_spend),
+        delta: "#{a.period_label.downcase}, sin IVA",
+        hint:  "En qué categorías de Fudo se fue la plata. #{int(a.ingredients_count)} insumos, #{int(a.purchases_count)} compras." } do %>
+    <table class="table table--compact">
+      <thead><tr><th>Categoría</th><th class="num">Gasto</th><th class="num">Del total</th></tr></thead>
+      <tbody>
+        <%# Ya viene ordenado de mayor a menor gasto. La ruta es la de categoría de Fudo,
+            que va por nombre, igual que en la sección "Por categoría" de más abajo. %>
+        <% a.grouped_by_fudo_category.each do |g| %>
+          <tr>
+            <td><%= link_to g.name, fudo_category_path(g.name, period: a.period_key) %></td>
+            <td class="num"><%= money(g.spend) %></td>
+            <td class="num muted"><%= number_with_precision(g.share, precision: 1, separator: ",") %>%</td>
+          </tr>
+        <% end %>
+      </tbody>
+      <tfoot><tr><th>Total</th><th class="num"><%= money(a.total_spend) %></th><th class="num">100%</th></tr></tfoot>
+    </table>
+  <% end %>
+
+  <%= render layout: "kpi", locals: {
+        label: "La canasta",
+        value: a.basket_change_pct ? pct_text(a.basket_change_pct + 100, 100) : "—",
+        value_class: a.basket_change_pct.nil? ? "" : (a.basket_change_pct.positive? ? "txt--bad" : "txt--good"),
+        delta: "ponderada por gasto, sobre #{int(a.reliable_rows.size)} insumos" +
+               (a.unreliable_count.positive? ? " (#{int(a.unreliable_count)} fuera por pocos datos)" : ""),
+        hint:  "Cuánto aporta cada insumo al índice. Los puntos suman la canasta: pesa la variación por el gasto, " \
+               "para que un insumo de millones mueva más que uno de miles. Quedan fuera las comparaciones con menos " \
+               "de #{IngredientPrices::MIN_CONFIDENCE} compras en algún extremo." } do %>
+    <% aportes = a.basket_contributions %>
+    <% if aportes.empty? %>
+      <p class="muted">No hay comparaciones fiables en este período.</p>
+    <% else %>
+      <table class="table table--compact">
+        <thead><tr><th>Insumo</th><th class="num">Gasto</th><th class="num">Variación</th><th class="num">Aporta</th></tr></thead>
+        <tbody>
+          <% aportes.first(12).each do |row, pp| %>
+            <tr>
+              <td><%= link_to row.name, ingredient_path(row.ingredient_id) %></td>
+              <td class="num muted"><%= money(row.spend) %></td>
+              <td class="num"><%= price_change_badge(row.recent_price, row.baseline_price) %></td>
+              <td class="num <%= pp.positive? ? 'txt--bad' : 'txt--good' %>"><%= format("%+.2f", pp).tr(".", ",") %> pp</td>
+            </tr>
+          <% end %>
+        </tbody>
+        <% if aportes.size > 12 %>
+          <tfoot><tr><td colspan="3" class="muted">Otros <%= aportes.size - 12 %> insumos</td>
+            <td class="num muted"><%= format("%+.2f", aportes.drop(12).sum { |(_, pp)| pp }).tr(".", ",") %> pp</td></tr></tfoot>
+        <% end %>
+      </table>
+    <% end %>
+  <% end %>
+
   <% impact = a.spend_impact_total %>
-  <div class="kpi">
-    <div class="kpi__label"><%= impact.negative? ? "Ahorro" : "Costó de más" %></div>
-    <div class="kpi__value <%= impact.negative? ? 'txt--good' : 'txt--bad' %>"><%= money(impact.abs) %></div>
-    <div class="kpi__delta muted">comprando el mismo volumen al precio de ahora</div>
-  </div>
-  <div class="kpi">
-    <div class="kpi__label">Insumos</div>
-    <div class="kpi__value"><%= int(a.ingredients_count) %></div>
-    <div class="kpi__delta muted"><%= int(a.purchases_count) %> compras</div>
-  </div>
-  <div class="kpi">
-    <div class="kpi__label">Subieron</div>
-    <div class="kpi__value"><%= int(a.rising.size) %></div>
-    <div class="kpi__delta muted"><%= int(a.falling.size) %> bajaron</div>
-  </div>
-  <div class="kpi">
-    <div class="kpi__label">A revisar</div>
-    <div class="kpi__value"><%= int(a.suspicious_count) %></div>
-    <div class="kpi__delta muted">líneas con precio dudoso</div>
-  </div>
+  <%= render layout: "kpi", locals: {
+        label: impact.negative? ? "Ahorro" : "Costó de más",
+        value: money(impact.abs),
+        value_class: impact.negative? ? "txt--good" : "txt--bad",
+        delta: "comprando el mismo volumen al precio de ahora",
+        hint:  "Cantidad comprada x (precio de ahora − precio del arranque), insumo a insumo. " \
+               "En verde lo que abarató la cuenta y en rojo lo que la encareció; la suma es el total de arriba. " \
+               "Es un «si compraras lo mismo al precio de ahora», no la plata que salió de la caja." } do %>
+    <% aportes = a.impact_contributions %>
+    <% if aportes.empty? %>
+      <p class="muted">No hay comparaciones fiables en este período.</p>
+    <% else %>
+      <table class="table table--compact">
+        <thead><tr><th>Insumo</th><th class="num">Cantidad</th><th class="num">Antes</th><th class="num">Ahora</th><th class="num">Impacto</th></tr></thead>
+        <tbody>
+          <% aportes.first(12).each do |row, pesos| %>
+            <tr>
+              <td><%= link_to row.name, ingredient_path(row.ingredient_id) %></td>
+              <td class="num muted"><%= number_with_precision(row.quantity, precision: 1, separator: ",", delimiter: ".") %> <%= row.unit_label %></td>
+              <td class="num muted"><%= money(row.baseline_price) %></td>
+              <td class="num"><%= money(row.recent_price) %></td>
+              <td class="num <%= pesos.negative? ? 'txt--good' : 'txt--bad' %>"><%= money(pesos) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+        <% if aportes.size > 12 %>
+          <tfoot><tr><td colspan="4" class="muted">Otros <%= aportes.size - 12 %> insumos</td>
+            <td class="num muted"><%= money(aportes.drop(12).sum { |(_, v)| v }) %></td></tr></tfoot>
+        <% end %>
+      </table>
+    <% end %>
+  <% end %>
+
+  <%= render layout: "kpi", locals: {
+        label: "Subieron", value: int(a.rising.size),
+        delta: "#{int(a.falling.size)} bajaron",
+        hint:  "Un insumo cuenta como movido cuando su variación pasa de ±#{number_with_precision(IngredientPrices::STABLE_PCT, precision: 0)}%; " \
+               "por debajo se considera precio estable." } do %>
+    <div class="grid-2">
+      <div>
+        <h3 class="kpi__subtitle txt--bad">Subieron (<%= int(a.rising.size) %>)</h3>
+        <%= render "ingredients/kpi_moves", rows: a.rising.sort_by { |r| -r.change_pct } %>
+      </div>
+      <div>
+        <h3 class="kpi__subtitle txt--good">Bajaron (<%= int(a.falling.size) %>)</h3>
+        <%= render "ingredients/kpi_moves", rows: a.falling.sort_by(&:change_pct) %>
+      </div>
+    </div>
+  <% end %>
+
+  <%= render layout: "kpi", locals: {
+        label: "A revisar", value: int(a.suspicious_count),
+        delta: "líneas con precio dudoso",
+        hint:  "Líneas que no entran en ninguna mediana: o el precio se aleja más de #{IngredientPrices::OUTLIER_FACTOR.round}x " \
+               "de lo normal, o el monto cuadra con otra compra y la cantidad no. Su plata sí cuenta en el gasto. " \
+               "Se corrigen en Fudo." } do %>
+    <% if a.to_review.empty? %>
+      <p class="muted">Ninguna línea dudosa en este período.</p>
+    <% else %>
+      <table class="table table--compact">
+        <thead><tr><th>Insumo</th><th class="num">Líneas</th><th class="num">Precio normal</th><th>Última dudosa</th></tr></thead>
+        <tbody>
+          <% a.to_review.first(12).each do |row| %>
+            <% peor = row.suspicious.max_by { |p| p.purchased_on } %>
+            <tr>
+              <td><%= link_to row.name, ingredient_path(row.ingredient_id) %></td>
+              <td class="num"><%= int(row.suspicious_count) %></td>
+              <td class="num muted"><%= money(row.median_price) %> / <%= row.unit_label %></td>
+              <td class="muted small">
+                <%= peor.purchased_on.strftime("%d/%m/%y") %> ·
+                <%= number_with_precision(peor.quantity, precision: 2, separator: ",") %> <%= row.unit_label %>
+                por <%= money(peor.line_total) %> → <strong><%= money(peor.unit_price) %></strong>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+      <p class="small"><%= link_to "Revisar cargas", review_ingredients_path %> · las que son error de cantidad traen la cantidad correcta.</p>
+    <% end %>
+  <% end %>
 </section>
 
 <section class="card">

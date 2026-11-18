@@ -60,6 +60,33 @@ class IngredientsControllerTest < ActionDispatch::IntegrationTest
     assert_select "a[href=?]", review_ingredients_path, text: /Revisar cargas \(1\)/
   end
 
+  test "los cuadros se abren y el de Insumos ya no está" do
+    6.times { |i| buy(name: "Mozzarella", qty: 10, total: 60_000, on: HOY - (i * 5)) }
+
+    get ingredients_path
+
+    assert_response :success
+    etiquetas = css_select("section.kpis details.kpi > summary .kpi__label").map { |e| e.text.strip }
+    # El tercero se llama "Ahorro" o "Costó de más" según el signo del impacto.
+    assert_equal 5, etiquetas.size
+    assert_equal ["Gasto en insumos", "La canasta"], etiquetas.first(2)
+    assert_includes ["Ahorro", "Costó de más"], etiquetas[2]
+    assert_equal ["Subieron", "A revisar"], etiquetas.last(2)
+    assert_equal 5, css_select("section.kpis details.kpi .kpi__detail").size,
+                 "cada cuadro tiene su panel de detalle"
+    assert_not_includes etiquetas, "Insumos"
+  end
+
+  test "el cuadro del gasto enseña el desglose por categoría" do
+    6.times { |i| buy(name: "Mozzarella", qty: 10, total: 60_000, on: HOY - (i * 5)) }
+
+    get ingredients_path
+
+    detalle = css_select("section.kpis details.kpi").first.css(".kpi__detail").to_html
+    assert_match "Categoría", detalle
+    assert_match "$360.000", detalle, "el desglose cuadra con el gasto del cuadro"
+  end
+
   def alerta(suspect:)
     PriceAlert.create!(
       fudo_item_id: 9001, fudo_ingredient_id: 1, ingredient_name: "Ndjua piccante", unit_name: "kg",

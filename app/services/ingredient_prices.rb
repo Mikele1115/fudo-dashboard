@@ -222,6 +222,33 @@ class IngredientPrices
                  .sort_by { |r| -r.spend_impact }.first(n)
   end
 
+  # ---------- de dónde sale cada número (los cuadros que se abren) ----------
+  #
+  # Son DESCOMPOSICIONES, no rankings parecidos: la suma de las partes es exactamente
+  # el total que enseña el cuadro. Si alguna vez dejan de cuadrar, el error está aquí
+  # o en el total, y hay un test que lo comprueba.
+
+  # Lo que aporta cada insumo a la canasta, en puntos porcentuales.
+  # Ordenados por lo que más la mueven, suba o baje.
+  def basket_contributions
+    @basket_contributions ||= begin
+      comparables = reliable_rows.select { |r| r.spend.positive? }
+      peso        = comparables.sum(&:spend)
+      if peso.zero?
+        []
+      else
+        comparables.map { |r| [r, r.change_pct * r.spend / peso] }.sort_by { |(_, pp)| -pp.abs }
+      end
+    end
+  end
+
+  # Lo que aporta cada insumo al impacto en pesos. Incluye los dos signos: los que
+  # encarecen y los que abaratan. El ranking de abajo solo enseña los que encarecen.
+  def impact_contributions
+    @impact_contributions ||= reliable_rows.filter_map { |r| [r, r.spend_impact] if r.spend_impact }
+                                           .sort_by { |(_, v)| -v.abs }
+  end
+
   def sorted(key)
     case key
     when "spend"  then rows.sort_by { |r| -r.spend }

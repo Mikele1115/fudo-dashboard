@@ -1,0 +1,20 @@
+<%# Lista compacta de insumos que se movieron, para el cuadro "Subieron". %>
+<% if rows.empty? %>
+  <p class="muted small">Ninguno.</p>
+<% else %>
+  <table class="table table--compact">
+    <tbody>
+      <% rows.first(10).each do |row| %>
+        <tr>
+          <td><%= link_to row.name, ingredient_path(row.ingredient_id) %>
+            <%= confidence_note(row) %></td>
+          <td class="num muted"><%= money(row.spend) %></td>
+          <td class="num"><%= price_change_badge(row.recent_price, row.baseline_price) %></td>
+        </tr>
+      <% end %>
+      <% if rows.size > 10 %>
+        <tr><td colspan="3" class="muted small">y <%= rows.size - 10 %> más</td></tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>

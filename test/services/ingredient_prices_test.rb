@@ -151,6 +151,51 @@ class IngredientPricesTest < ActiveSupport::TestCase
     assert_equal a.spend_impact_total, a.grouped_by_fudo_category.sum(&:spend_impact)
   end
 
+  # ---------- descomposición de los cuadros ----------
+
+  def canasta_variada
+    # Tres insumos con pesos y variaciones distintas, para que la ponderación importe.
+    3.times { |i| buy(name: "Mozzarella", on: TODAY - 360 + i, qty: 10, unit_total: 60_000) }
+    3.times { |i| buy(name: "Mozzarella", on: TODAY - 10 + i,  qty: 10, unit_total: 70_000) }
+    3.times { |i| buy(name: "Harina", on: TODAY - 360 + i, qty: 20, unit_total: 30_000, ingredient_id: 2) }
+    3.times { |i| buy(name: "Harina", on: TODAY - 10 + i,  qty: 20, unit_total: 26_000, ingredient_id: 2) }
+    3.times { |i| buy(name: "Albahaca", on: TODAY - 360 + i, qty: 8, unit_total: 6_000, ingredient_id: 3) }
+    3.times { |i| buy(name: "Albahaca", on: TODAY - 10 + i,  qty: 8, unit_total: 9_500, ingredient_id: 3) }
+  end
+
+  test "los aportes a la canasta suman exactamente la canasta" do
+    canasta_variada
+    a = IngredientPrices.new(period: "12", to: TODAY)
+
+    assert_equal 3, a.basket_contributions.size
+    assert_in_delta a.basket_change_pct, a.basket_contributions.sum { |(_, pp)| pp }, 0.0001
+  end
+
+  test "los aportes al impacto suman exactamente el impacto" do
+    canasta_variada
+    a = IngredientPrices.new(period: "12", to: TODAY)
+
+    assert_in_delta a.spend_impact_total, a.impact_contributions.sum { |(_, v)| v }, 0.01
+  end
+
+  test "los aportes vienen ordenados por lo que más mueven, en cualquier dirección" do
+    canasta_variada
+    aportes = IngredientPrices.new(period: "12", to: TODAY).basket_contributions
+
+    magnitudes = aportes.map { |(_, pp)| pp.abs }
+    assert_equal magnitudes.sort.reverse, magnitudes
+    assert aportes.any? { |(_, pp)| pp.negative? }, "la Harina bajó: tiene que aportar en negativo"
+    assert aportes.any? { |(_, pp)| pp.positive? }, "la Mozzarella subió"
+  end
+
+  test "sin comparaciones fiables la descomposición está vacía en vez de romperse" do
+    2.times { |i| buy(name: "Trufa", on: TODAY - 10 + i, qty: 1, unit_total: 50_000) }
+    a = IngredientPrices.new(period: "12", to: TODAY)
+
+    assert_empty a.basket_contributions
+    assert_empty a.impact_contributions
+  end
+
   # ---------- líneas con la cantidad mal cargada ----------
 
   # El caso de la burrata: precio real $5.960/unidad, con 16 unidades cargadas donde eran

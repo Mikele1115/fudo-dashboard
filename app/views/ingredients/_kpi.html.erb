@@ -1,0 +1,25 @@
+<%# Cuadro de KPI que se abre para enseñar de dónde sale el número.
+
+    Es un <details> nativo: sin JavaScript, funciona con teclado, y abrir y cerrar lo
+    gestiona el navegador. Al abrirse ocupa toda la fila (ver .kpi[open] en el CSS),
+    porque en un quinto del ancho no cabe una tabla.
+
+    Se usa con `render layout: "kpi"` y un bloque con el detalle. Locals: `label` y
+    `value` obligatorios; `value_class`, `delta` y `hint` opcionales.
+
+    Ojo al tocar este comentario: no puede contener la marca de cierre de ERB, porque
+    el comentario termina en la primera que aparezca y el resto sale impreso en la
+    página. Pasó con un ejemplo de uso que había aquí. %>
+<details class="kpi">
+  <summary>
+    <div class="kpi__label"><%= label %></div>
+    <div class="kpi__value <%= local_assigns[:value_class] %>"><%= value %></div>
+    <div class="kpi__delta muted"><%= local_assigns[:delta] %></div>
+  </summary>
+  <div class="kpi__detail">
+    <% if local_assigns[:hint].present? %>
+      <p class="muted small kpi__hint"><%= hint %></p>
+    <% end %>
+    <%= yield %>
+  </div>
+</details>
