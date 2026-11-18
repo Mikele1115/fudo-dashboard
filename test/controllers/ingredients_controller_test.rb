@@ -79,6 +79,28 @@ class IngredientsControllerTest < ActionDispatch::IntegrationTest
     assert_not_includes etiquetas, "Insumos"
   end
 
+  test "el recuadro explica el criterio que de verdad se está usando" do
+    # 12 meses: se parte en dos ventanas dentro del período.
+    10.times { |j| buy(name: "Mozzarella", qty: 10, total: 60_000, on: HOY - (j * 30)) }
+
+    get ingredients_path(period: "12")
+
+    cabecera = css_select("section.page-head").first
+    assert_match "90 días al principio contra 90 al final", cabecera.text
+    assert_no_match(/primeros 90 días/, cabecera.text,
+                    "esa redacción sugería que se cuentan desde el inicio del período, y no es así")
+    recuadro = cabecera.css("details.note").text
+    assert_match "dos bloques de 90 días", recuadro
+    assert_match "desde que lo compraste por primera vez", recuadro
+
+    # 1 mes: se compara contra el período anterior, y el recuadro tiene que decir eso.
+    get ingredients_path(period: "1")
+
+    recuadro = css_select("section.page-head details.note").text
+    assert_match "no se parte en dos", recuadro
+    assert_no_match(/dos bloques/, recuadro)
+  end
+
   # ---------- buscador de insumos ----------
 
   def catalogo

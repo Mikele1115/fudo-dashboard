@@ -11,6 +11,32 @@
     <p class="muted small">
       Precios netos, sin IVA · <%= a.comparison_note %>
     </p>
+    <details class="note">
+      <summary>Cómo se mide si un insumo subió o bajó</summary>
+      <% if a.split? %>
+        <ul>
+          <li>De cada insumo se miran <strong>dos bloques de <%= a.window_days %> días</strong>:
+              los <%= a.window_days %> primeros desde que lo compraste por primera vez en el
+              período, y los <%= a.window_days %> últimos hasta su última compra.</li>
+          <li>De cada bloque se toma el <strong>precio del medio</strong> (la mediana), no el
+              promedio: así una compra rara suelta no mueve el resultado.</li>
+          <li>Lo de en medio no se usa. Interesa cómo estaba al principio y cómo está ahora,
+              no el camino.</li>
+          <li>Si un insumo lleva menos de <%= a.window_days %> días comprándose, no hay dos
+              bloques: en vez de inventar un número, la variación sale «—».</li>
+        </ul>
+      <% else %>
+        <ul>
+          <li>El período es corto, así que no se parte en dos: se compara entero contra
+              <strong>los <%= (a.to - a.from).to_i + 1 %> días anteriores</strong>
+              (<%= a.previous_from.strftime("%d/%m/%Y") %> → <%= (a.from - 1).strftime("%d/%m/%Y") %>).</li>
+          <li>De cada lado se toma el <strong>precio del medio</strong> (la mediana), no el
+              promedio: así una compra rara suelta no mueve el resultado.</li>
+          <li>Si no compraste ese insumo en el período anterior, no hay con qué comparar y
+              la variación sale «—».</li>
+        </ul>
+      <% end %>
+    </details>
   </div>
   <%# Ojo: el botón de actualizar va FUERA del formulario del período.
       button_to genera su propio <form>, y un formulario dentro de otro es HTML

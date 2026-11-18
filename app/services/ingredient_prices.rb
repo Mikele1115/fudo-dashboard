@@ -364,9 +364,14 @@ class IngredientPrices
   def previous_from = @from - ((@to - @from).to_i + 1)
 
   # Cómo se calculan las variaciones, para decirlo en pantalla.
+  #
+  # Ojo con la redacción del caso :split. Decía "primeros N días contra los últimos N",
+  # que suena a que se cuentan desde el primer día del período, y no es así: se cuentan
+  # desde la primera compra de CADA insumo. Los camarones arrancan el 20/11 porque ese
+  # día se compraron por primera vez, no el 15/11 que empieza el período.
   def comparison_note
     if split?
-      "variaciones: primeros #{window_days} días contra los últimos #{window_days}"
+      "variaciones: #{window_days} días al principio contra #{window_days} al final"
     else
       "variaciones: contra los #{(@to - @from).to_i + 1} días anteriores " \
         "(#{previous_from.strftime('%d/%m/%Y')} → #{(@from - 1).strftime('%d/%m/%Y')})"
