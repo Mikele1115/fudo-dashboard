@@ -44,7 +44,7 @@ export default class extends Controller {
   }
 
   statusText(q, visibles, verTodo) {
-    const cola = " Haz clic en uno para ver todas sus compras y la evolución de su precio."
+    const cola = " Haz clic en uno para ver su detalle."
     if (verTodo) return `Los ${this.totalValue} insumos del período.${cola}`
 
     const verbo = visibles === 1 ? "coincide" : "coinciden"

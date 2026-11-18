@@ -73,11 +73,16 @@
 
 <section class="card">
   <h2>Evolución del precio</h2>
-  <p class="muted small">
-    Todo el historial disponible, no solo el período elegido. Cada punto es una compra.
-    Incluye las compras marcadas como dudosas: si ves una caída o un pico aislado, suele ser una
-    línea mal cargada en Fudo —búscala en la tabla de abajo.
-  </p>
+  <p class="muted small">Todo el historial, no solo el período elegido. Cada punto es una compra.</p>
+  <details class="note">
+    <summary>Si ves un pico o una caída sueltos</summary>
+    <ul>
+      <li>El gráfico incluye a propósito las compras marcadas como dudosas, que sí quedan
+          fuera de las medianas. Un punto aislado suele ser una línea mal cargada en Fudo,
+          no un precio que se movió.</li>
+      <li>Búscala en la tabla de abajo: las dudosas van señaladas.</li>
+    </ul>
+  </details>
   <div class="chart chart--tall">
     <canvas data-controller="chart" data-chart-config-value="<%= price_chart_config(@history).to_json %>"></canvas>
   </div>

@@ -4,10 +4,7 @@
 <section class="page-head">
   <div>
     <h1>Categorías de insumos</h1>
-    <p class="muted">
-      Cada insumo pertenece a una categoría, y cada categoría a un área del restaurante.
-      Así el análisis responde tanto «cuánto gasta el bar» como «cuánto gasto en quesos».
-    </p>
+    <p class="muted">Para saber tanto cuánto gasta el bar como cuánto gastas en quesos.</p>
   </div>
   <%= link_to "‹ Volver a insumos", ingredients_path, class: "btn btn--ghost" %>
 </section>
@@ -25,10 +22,7 @@
   <div class="card--actions">
     <div>
       <h2>Asignar insumos</h2>
-      <p class="muted small">
-        Cambia los que quieras y pulsa Guardar al final. Lo que asignes a mano queda fijo:
-        una nueva pasada de las reglas automáticas no lo toca.
-      </p>
+      <p class="muted small">Cambia los que quieras y pulsa Guardar al final.</p>
     </div>
     <form method="get" action="<%= ingredient_categories_path %>" class="toolbar">
       <select name="filter" onchange="this.form.requestSubmit()">
@@ -85,11 +79,17 @@
 
 <section class="card">
   <h2>Tipos de insumo</h2>
-  <p class="muted small">
-    Son el segundo nivel del análisis, el que Fudo no tiene. La categoría de arriba
-    (Ingredientes Pizza, Barra…) viene de Fudo y se edita en el POS, no aquí.
-    Si te falta un tipo, créalo abajo y asígnale insumos.
-  </p>
+  <details class="note">
+    <summary>Qué son y en qué se diferencian de las categorías de Fudo</summary>
+    <ul>
+      <li>La categoría de arriba (Ingredientes Pizza, Barra…) <strong>viene de Fudo</strong>
+          y se edita en el POS, no aquí.</li>
+      <li>El tipo de insumo es el segundo nivel, el que Fudo no tiene: es lo que deja ver
+          si lo que se mueve son los quesos o las harinas.</li>
+      <li>Lo que asignes a mano queda fijo: una nueva pasada de las reglas no lo toca.</li>
+      <li>Si te falta un tipo, créalo aquí al lado y asígnale insumos arriba.</li>
+    </ul>
+  </details>
 
   <div class="grid-2">
     <div>
@@ -126,9 +126,8 @@
       <% end %>
 
       <hr class="sep">
-      <p class="muted small">
-        Las reglas automáticas clasifican por palabras clave en el nombre del insumo.
-        Si cargas insumos nuevos en Fudo, vuelve a pasarlas: solo tocan lo que no has asignado tú.
+      <p class="muted small" title="Clasifican por palabras clave del nombre. Solo tocan lo que no has asignado tú.">
+        Para los insumos nuevos que cargues en Fudo.
       </p>
       <%= button_to "Volver a aplicar reglas", reclassify_ingredient_categories_path, class: "btn btn--light", form_class: "inline" %>
     </div>

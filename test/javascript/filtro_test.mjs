@@ -49,7 +49,7 @@ comprueba("  se ve la invitación y se esconde la tabla", [c.promptTarget.hidden
 c = montar({ texto: "moz" });
 comprueba("buscando «moz» sale solo la mozzarella", visibles(c), ["mozzarella"]);
 comprueba("  con el texto en singular", c.statusTarget.textContent,
-          "1 de 5 insumos coincide con «moz». Haz clic en uno para ver todas sus compras y la evolución de su precio.");
+          "1 de 5 insumos coincide con «moz». Haz clic en uno para ver su detalle.");
 
 c = montar({ texto: "ar" });
 comprueba("una búsqueda parcial saca varias", visibles(c), ["mozzarella", "harina"]);

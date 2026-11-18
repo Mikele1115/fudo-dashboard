@@ -5,7 +5,7 @@
 <section class="page-head">
   <div>
     <h1>Ventas del <%= long_date(m.report_date) %></h1>
-    <p class="muted">Comparado con el <%= long_date(m.ly_date) %>. <%= compare_note %></p>
+    <p class="muted">Comparado con el <%= long_date(m.ly_date) %>.</p>
   </div>
   <form class="datepicker" method="get" action="<%= root_path %>">
     <%= link_to "‹", root_path(date: m.report_date - 1), class: "btn btn--ghost", title: "Día anterior" %>
@@ -89,12 +89,20 @@
         <tr><td>Propinas</td><td><%= money(d&.tips) %></td><td><%= money(ly&.tips) %></td><td><%= pct_badge(d&.tips, ly&.tips) %></td></tr>
       </tbody>
     </table>
-    <p class="muted small">Venta neta = bruta ÷ <%= 1 + AppSettings.vat_rate %>. Ticket por persona = venta de salón con comensales registrados ÷ comensales. Las propinas no están incluidas en la venta.</p>
+    <details class="note">
+      <summary>Cómo se calculan</summary>
+      <ul>
+        <li>Venta neta = bruta ÷ <%= 1 + AppSettings.vat_rate %>.</li>
+        <li>Ticket por persona = venta de salón con comensales registrados ÷ comensales,
+            no la venta del día entre los comensales.</li>
+        <li>Las propinas no van incluidas en la venta.</li>
+        <li><%= compare_note %> <%= cutoff_note %></li>
+      </ul>
+    </details>
   </section>
 
   <section class="card">
     <h2>Acumulados</h2>
-    <p class="muted">Semana, mes y año en curso hasta el día informado, contra el mismo período del año anterior.</p>
     <table class="table">
       <thead><tr><th></th><th>Venta bruta</th><th>Año anterior</th><th>Variación</th><th>Venta neta</th><th>Tickets</th><th>Ticket/persona</th></tr></thead>
       <tbody>
@@ -124,7 +132,7 @@
     <h2>Comparativa de todos los años</h2>
     <span class="muted small">Histórico desde <%= m.years.last.year %></span>
   </div>
-  <p class="muted">Cada año completo y su variación respecto al año anterior. El año en curso llega hasta el <%= m.report_date.strftime("%d/%m") %>.</p>
+  <p class="muted small">El año en curso llega hasta el <%= m.report_date.strftime("%d/%m") %>.</p>
   <table class="table table--rows">
     <thead><tr><th>Año</th><th>Venta bruta</th><th>vs. año ant.</th><th>Venta neta</th><th>Tickets</th><th>Ticket prom.</th><th>Comensales</th><th>Ticket/persona</th><th>vs. año ant.</th><th>Propinas</th><th>Días</th></tr></thead>
     <tbody>
@@ -254,8 +262,8 @@
 <section class="card card--actions">
   <div>
     <h2>Informe diario por correo</h2>
-    <p class="muted">
-      Se envía todos los días a las 00:00 con estos mismos indicadores.
+    <p class="muted small">
+      Todos los días a las 00:00.
       <% if last_delivery %>
         Último envío: <%= last_delivery.report_date %> —
         <% if last_delivery.sent? %><span class="pct pct--up">enviado</span> a <%= last_delivery.recipients %>

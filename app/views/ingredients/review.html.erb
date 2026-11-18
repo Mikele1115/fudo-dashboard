@@ -4,11 +4,7 @@
 <section class="page-head">
   <div>
     <h1>Revisar cargas</h1>
-    <p class="muted">
-      Compras donde el monto coincide con el de otra compra del mismo insumo,
-      pero la cantidad cargada es otra. El dinero que salió del local está bien;
-      lo que está mal es la cantidad, y con ella el precio por <%= "kilo/litro/unidad" %>.
-    </p>
+    <p class="muted">La plata está bien; la cantidad no. Se corrigen en Fudo.</p>
   </div>
   <div class="datepicker">
     <form method="get" action="<%= review_ingredients_path %>" class="inline">
@@ -26,8 +22,11 @@
   <section class="card">
     <h2>Nada que revisar en este período</h2>
     <p class="muted">
-      No hay líneas donde el monto cuadre con una compra normal y la cantidad no.
-      Prueba con un período más largo: en todo el historial hay <%= int(@all.size) %>.
+      <% if @all.any? %>
+        En todo el historial hay <%= int(@all.size) %>: prueba con un período más largo.
+      <% else %>
+        Ninguna carga sospechosa en todo el historial.
+      <% end %>
     </p>
   </section>
 <% else %>
@@ -56,25 +55,20 @@
   </div>
 </section>
 
-<section class="card">
-  <h2>Cómo se detecta</h2>
-  <p class="muted small">
-    Para cada insumo se toma su precio habitual (la mediana de todo su historial, que no
-    se mueve por un dato suelto). Una línea se marca cuando su precio por unidad se aleja
-    más del <%= (QuantityTypos::PRICE_TOL * 100).round %>% de ese habitual
-    <strong>y</strong> su monto coincide, al <%= (QuantityTypos::MONEY_TOL * 100).round(1).to_s.sub(".0", "") %>%,
-    con el de otra compra hecha al precio normal en una cantidad que el insumo compra de
-    verdad. Si la plata es la misma y la cantidad no, lo que falla es la cantidad —
-    y esa otra compra dice cuál era la correcta.
-  </p>
-  <p class="muted small">
-    Esto <strong>no corrige nada</strong> ni cambia los cálculos: las líneas siguen
-    contando igual que hasta ahora, para que el error siga saltando hasta que se arregle
-    en Fudo. Las compras con el precio directamente fuera de rango se siguen listando
-    abajo del todo en <%= link_to "Insumos", ingredients_path %>, que es otro problema:
-    allí no se sabe cuál era la cantidad buena.
-  </p>
-</section>
+<details class="note">
+  <summary>Cómo se detecta y qué efecto tiene</summary>
+  <ul>
+    <li>Una línea se marca cuando su precio se aleja más del
+        <%= (QuantityTypos::PRICE_TOL * 100).round %>% del habitual del insumo (la mediana
+        de todo su historial) <strong>y</strong> su monto coincide, al
+        <%= (QuantityTypos::MONEY_TOL * 100).round(1).to_s.sub(".0", "") %>%, con el de otra
+        compra al precio normal hecha en otra cantidad. Esa otra compra dice cuál era la correcta.</li>
+    <li><strong>El dato no se corrige aquí.</strong> Se arregla en Fudo; esto solo lo señala.</li>
+    <li>Mientras tanto, estas líneas <strong>no entran en ninguna mediana</strong> del informe
+        de precios, igual que las de precio fuera de rango. Lo que sí cuenta es su monto,
+        porque esa plata salió de la caja.</li>
+  </ul>
+</details>
 
 <% por_insumo = @findings.group_by(&:ingredient_id).values.sort_by { |g| -g.size } %>
 <% if por_insumo.size > 1 %>

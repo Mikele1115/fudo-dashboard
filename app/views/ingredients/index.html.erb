@@ -142,7 +142,7 @@
     <% else %>
       Los <%= int(a.ingredients_count) %> insumos del período.
     <% end %>
-    Haz clic en uno para ver todas sus compras y la evolución de su precio.
+    Haz clic en uno para ver su detalle.
   </p>
 
   <%# Fuera del párrafo de estado a propósito: el JS reescribe ese texto al filtrar y se
@@ -422,9 +422,8 @@
 
 <section class="card">
   <h2>Los que más encarecieron la cuenta</h2>
-  <p class="muted small">
-    Subida de precio multiplicada por el volumen comprado. Un insumo barato que sube mucho puede dar igual;
-    uno caro que sube poco puede costar millones.
+  <p class="muted small" title="Un insumo barato que sube mucho puede dar igual; uno caro que sube poco puede costar millones.">
+    Subida de precio por el volumen comprado.
   </p>
   <table class="table">
     <tr><th>Insumo</th><th>Variación</th><th>Comprado</th><th>Costó de más</th></tr>
