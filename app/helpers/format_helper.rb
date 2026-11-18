@@ -119,6 +119,29 @@ module FormatHelper
     gap&.material? ? "#{gap.text} que el año anterior" : nil
   end
 
+  # Aviso de que el día con el que se compara no fue un día corriente, así que el
+  # porcentaje de al lado se lee distinto. nil cuando fue normal.
+  #
+  #   "El 03/11/2025 fue un lunes excepcional: +76% sobre la mediana de los lunes de 2025,
+  #    así que la comparación es más exigente de lo normal."
+  def outlier_note(outlier)
+    return nil if outlier.nil?
+
+    calificativo = outlier.high? ? "excepcional" : "muy flojo"
+    lectura      = outlier.high? ? "más exigente" : "más fácil"
+    "El #{outlier.date.strftime('%d/%m/%Y')} fue un #{outlier.weekday} #{calificativo}: " \
+      "#{format('%+.0f%%', outlier.pct)} sobre la mediana de los #{outlier.weekday_plural} " \
+      "de #{outlier.date.year}, así que la comparación es #{lectura} de lo normal."
+  end
+
+  # Marca corta para las tablas, con el detalle en el título.
+  def outlier_flag(outlier)
+    return "" if outlier.nil?
+
+    tag.span("⚠", class: "warn", title: outlier_note(outlier),
+             aria: { label: "El día de referencia no fue un día corriente" })
+  end
+
   def cutoff_note
     cutoff = AppSettings.cutoff_hour
     return "" if cutoff.zero?

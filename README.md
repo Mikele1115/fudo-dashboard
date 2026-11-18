@@ -12,7 +12,18 @@ en un dashboard con todos los indicadores, y envía un informe por correo todos 
 - Comparativa de todos los años del histórico (`HISTORY_FROM`): tabla año a año, mismo período de cada
   año (1 ene → misma fecha) y gráfico de ventas por mes con una línea por año.
 - Comparación con el año anterior: mismo día de la semana (`COMPARE_MODE=weekday`, D − 364 días)
-  o misma fecha (`COMPARE_MODE=date`).
+  o misma fecha (`COMPARE_MODE=date`). **Cuando el día base no fue corriente, el panel lo avisa**
+  (`Metrics::Outlier`): comparar contra el mismo día del año pasado falla si ese día fue
+  excepcional. El 3/11/2025 fue el segundo mejor lunes de 2025, un 76% sobre la mediana de los
+  lunes de ese año, y contra él un buen lunes de 2026 —el décimo mejor de 46, un 18% sobre el
+  promedio— salía como −25,1%. El porcentaje era correcto y la lectura, falsa. El caso al revés
+  es peor: el 25/02/2025 fue un martes casi cerrado (−86%), y el panel mostraba **+906,9%**.
+
+  La vara es la mediana de ese día de la semana en ese año, y el umbral `OUTLIER_PCT` (±40%)
+  se midió contra los 317 días de 2026 con comparable: avisa en 33, un 10%, unos 3 al mes. Con
+  ±30% saltaban 63 y con ±20%, 110; a ese ritmo el aviso deja de leerse. El aviso sale entero en
+  la comparación del dashboard y en el correo diario, y como una marca con el detalle en el
+  título en las tablas de «últimos días» e «Historial».
 - Acumulados: semana en curso, mes en curso y año en curso contra el mismo período del año anterior.
   La semana se compara por día de la semana (D − 364), pero el mes y el año se comparan por calendario,
   y esas dos ventanas no siempre traen los mismos días: del 1 al 10 de noviembre de 2026 hay un sábado

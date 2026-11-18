@@ -79,13 +79,30 @@ class Metrics
   YearRow = Struct.new(:year, :full, :ytd, :ytd_to, :complete, keyword_init: true)
 
   # Un día de la tabla de "últimos días" con su comparable del año anterior.
-  DayRow = Struct.new(:date, :day, :ly_date, :ly_day, keyword_init: true)
+  # ly_outlier avisa de que ese comparable no fue un día corriente (nil si lo fue).
+  DayRow = Struct.new(:date, :day, :ly_date, :ly_day, :ly_outlier, keyword_init: true)
+
+  # El día con el que se compara, cuando se salió de lo normal para su propio año.
+  #
+  # Comparar un día contra el mismo día de la semana del año pasado falla cuando ese día
+  # fue excepcional: el 3/11/2025 fue el segundo mejor lunes de 2025 (+76% sobre la
+  # mediana de los lunes de ese año), y contra él un buen lunes de 2026 —el décimo mejor
+  # de 46— aparecía como −25,1%. El porcentaje era correcto y la lectura, falsa.
+  Outlier = Struct.new(:date, :total, :median, :pct, keyword_init: true) do
+    # true  -> el día base fue alto: la comparación es más exigente de lo normal
+    # false -> fue flojo: la comparación es más fácil de lo normal
+    def high? = pct.positive?
+
+    def weekday        = WEEKDAYS[date.wday]
+    def weekday_plural = weekday.end_with?("s") ? weekday : "#{weekday}s"
+  end
 
   Result = Struct.new(
     :report_date,    # Date del día informado
     :day,            # Day del día informado (nil si no hay datos sincronizados)
     :ly_date,        # Date comparable del año anterior
     :ly_day,         # Day del año anterior (puede ser nil)
+    :ly_outlier,     # Outlier si ese día no fue corriente para su año (si no, nil)
     :ytd,            # Average: promedio diario del año en curso (1 ene -> día informado)
     :ly_same_period, # Average: promedio diario del año anterior en el mismo período
     :ly_full,        # Average: promedio diario del año anterior completo
@@ -107,6 +124,13 @@ class Metrics
 
   # Un desajuste de calendario que mueve el período menos que esto no cambia la lectura: no se avisa.
   MATERIAL_GAP_PCT = 2.0
+
+  # Cuánto tiene que salirse de lo normal el día con el que se compara para avisarlo.
+  #
+  # Medido contra los 317 días de 2026 que tienen comparable: con ±40% se avisa en 33
+  # (un 10%, unos 3 al mes), que es el mismo calibrado que las alertas de precio. Con
+  # ±30% saltaban 63 y con ±20%, 110: a ese ritmo el aviso deja de leerse.
+  OUTLIER_PCT = 40.0
 
   # Venta neta: quita el IVA incluido en el total.
   def self.net(amount)
@@ -148,6 +172,7 @@ class Metrics
       day:            day(d),
       ly_date:        ly(d),
       ly_day:         day(ly(d)),
+      ly_outlier:     outlier_for(ly(d)),
       ytd:            average(year_start..d),
       ly_same_period: average(ly_year_start..(d << 12)),
       ly_full:        average(ly_year_start..ly_year_end),
@@ -166,7 +191,37 @@ class Metrics
   end
 
   def day_row(date)
-    DayRow.new(date: date, day: day(date), ly_date: ly(date), ly_day: day(ly(date)))
+    DayRow.new(date: date, day: day(date), ly_date: ly(date), ly_day: day(ly(date)),
+               ly_outlier: outlier_for(ly(date)))
+  end
+
+  # ¿Fue `date` un día fuera de lo normal para su propio año? Ver Outlier y OUTLIER_PCT.
+  def outlier_for(date)
+    d = day(date)
+    return nil if d.nil? || !d.open?
+
+    med = weekday_medians[[date.year, date.wday]]
+    return nil if med.nil? || med.zero?
+
+    pct = (d.total - med) / med * 100.0
+    return nil if pct.abs < OUTLIER_PCT
+
+    Outlier.new(date: date, total: d.total, median: med, pct: pct)
+  end
+
+  # Mediana de cada día de la semana en cada año: la vara con la que se mide si un día
+  # fue corriente. Mediana y no promedio, para que un día suelto no mueva la referencia.
+  def weekday_medians
+    @weekday_medians ||= @days.values.select(&:open?)
+                              .group_by { |d| [d.date.year, d.date.wday] }
+                              .transform_values { |ds| self.class.median(ds.map(&:total)) }
+  end
+
+  def self.median(values)
+    return nil if values.empty?
+
+    s = values.sort
+    s.size.odd? ? s[s.size / 2] : (s[(s.size / 2) - 1] + s[s.size / 2]) / 2.0
   end
 
   # Suma de un rango de fechas y del rango equivalente del año anterior.

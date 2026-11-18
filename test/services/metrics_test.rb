@@ -101,6 +101,84 @@ class MetricsTest < ActiveSupport::TestCase
     assert_equal 30, r.charts[:last_days][:labels].size
   end
 
+  # ---------- el día con el que se compara no fue corriente ----------
+
+  # Doce sábados de 2025 a 1.000 y uno a 2.000: la mediana es 1.000 y ese día se sale.
+  def sabados_de_2025(excepcional: nil)
+    fecha = Date.new(2025, 1, 4) # primer sábado de 2025
+    12.times do |i|
+      d = fecha + (i * 7)
+      DailySale.create!(date: d, total: (d == excepcional ? 2_000 : 1_000), tickets: 10)
+    end
+  end
+
+  test "avisa cuando el día comparable fue excepcional para su año" do
+    comparable = REPORT - 364 # sábado 13/09/2025
+    DailySale.where(date: comparable).delete_all
+    sabados_de_2025
+    DailySale.create!(date: comparable, total: 2_000, tickets: 10) # +100% sobre la mediana
+
+    o = Metrics.new(REPORT).build.ly_outlier
+
+    assert_not_nil o, "el comparable duplica la mediana de los sábados de 2025"
+    assert_equal comparable, o.date
+    assert_in_delta 100.0, o.pct, 0.01
+    assert_equal 1_000, o.median
+    assert o.high?, "fue alto: la comparación es más exigente de lo normal"
+    assert_equal "sábado",  o.weekday
+    assert_equal "sábados", o.weekday_plural
+  end
+
+  test "avisa también cuando el comparable fue un día muy flojo" do
+    comparable = REPORT - 364
+    DailySale.where(date: comparable).delete_all
+    sabados_de_2025
+    DailySale.create!(date: comparable, total: 300, tickets: 2) # -70%
+
+    o = Metrics.new(REPORT).build.ly_outlier
+
+    assert_not_nil o
+    assert_not o.high?, "fue flojo: la comparación es más fácil de lo normal"
+  end
+
+  test "un comparable corriente no se marca" do
+    comparable = REPORT - 364
+    DailySale.where(date: comparable).delete_all
+    sabados_de_2025
+    DailySale.create!(date: comparable, total: 1_200, tickets: 10) # +20%, por debajo del umbral
+
+    assert_nil Metrics.new(REPORT).build.ly_outlier
+  end
+
+  test "la mediana se calcula por día de la semana y por año, no sobre todo junto" do
+    comparable = REPORT - 364
+    DailySale.where(date: comparable).delete_all
+    sabados_de_2025
+    # Muchos martes flojos de 2025: no pueden arrastrar la vara de los sábados.
+    12.times { |i| DailySale.create!(date: Date.new(2025, 1, 7) + (i * 7), total: 100, tickets: 2) }
+    DailySale.create!(date: comparable, total: 1_200, tickets: 10)
+
+    assert_nil Metrics.new(REPORT).build.ly_outlier,
+               "1.200 es corriente para un sábado aunque sea enorme para un martes"
+  end
+
+  test "los días de la tabla de últimos días también traen su aviso" do
+    comparable = REPORT - 364
+    DailySale.where(date: comparable).delete_all
+    sabados_de_2025
+    DailySale.create!(date: comparable, total: 2_000, tickets: 10)
+
+    fila = Metrics.new(REPORT).build.recent.find { |r| r.date == REPORT }
+
+    assert_not_nil fila.ly_outlier
+  end
+
+  test "sin datos del comparable no se inventa nada" do
+    DailySale.where(date: REPORT - 364).delete_all
+
+    assert_nil Metrics.new(REPORT).build.ly_outlier
+  end
+
   # ---------- desajuste de días de la semana ----------
 
   test "el mes avisa cuando las dos ventanas no tienen los mismos días de la semana" do

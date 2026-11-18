@@ -8,6 +8,9 @@ Año anterior (<%= long_date(@m.ly_date) %>):
   Venta bruta <%= money(ly&.total) %> (<%= pct_text(d&.total, ly&.total) %>) | Venta neta <%= money(ly&.net) %> (<%= pct_text(d&.net, ly&.net) %>)
   Tickets <%= int(ly&.tickets) %> (<%= pct_text(d&.tickets, ly&.tickets) %>) | Ticket promedio <%= money(ly&.avg_ticket) %> (<%= pct_text(d&.avg_ticket, ly&.avg_ticket) %>)
   Comensales <%= int(ly&.people) %> (<%= pct_text(d&.people, ly&.people) %>) | Ticket por persona <%= money(ly&.avg_per_person) %> (<%= pct_text(d&.avg_per_person, ly&.avg_per_person) %>)
+<% if (aviso = outlier_note(@m.ly_outlier)) -%>
+  Ojo: <%= aviso %>
+<% end -%>
 
 Acumulados:
 <% @m.periods.each do |p| %>  <%= p.label %>: <%= money(p.current.total) %> vs. <%= money(p.ly.total) %> el año anterior (<%= pct_text(p.current.total, p.ly.total) %>) — ticket por persona <%= money(p.current.avg_per_person) %> (<%= pct_text(p.current.avg_per_person, p.ly.avg_per_person) %>)

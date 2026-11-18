@@ -130,7 +130,8 @@
             <td><%= money(row.day&.avg_ticket) %></td>
             <td><%= int(row.day&.people) %></td>
             <td><%= money(row.day&.avg_per_person) %></td>
-            <td class="muted"><%= money(row.ly_day&.total) %> <span class="small">(<%= short_date(row.ly_date) %>)</span></td>
+            <td class="muted"><%= money(row.ly_day&.total) %> <span class="small">(<%= short_date(row.ly_date) %>)</span>
+                <%= outlier_flag(row.ly_outlier) %></td>
             <td><%= pct_badge(row.day&.total, row.ly_day&.total) %></td>
           </tr>
         <% end %>

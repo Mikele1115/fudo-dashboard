@@ -66,6 +66,11 @@
   <section class="card">
     <h2>Comparación con el año anterior</h2>
     <p class="muted"><%= long_date(m.ly_date) %></p>
+    <%# Si el día base no fue corriente, el porcentaje es correcto y la lectura falsa.
+        Ver Metrics::Outlier. %>
+    <% if (aviso = outlier_note(m.ly_outlier)) %>
+      <p class="warn small">⚠ <%= aviso %></p>
+    <% end %>
     <table class="table">
       <thead><tr><th></th><th>Hoy</th><th>Año anterior</th><th>Variación</th></tr></thead>
       <tbody>
@@ -231,7 +236,8 @@
           <td><%= money(r.day&.avg_ticket) %></td>
           <td><%= int(r.day&.people) %></td>
           <td><%= money(r.day&.avg_per_person) %></td>
-          <td class="muted"><%= money(r.ly_day&.total) %> <span class="small">(<%= short_date(r.ly_date) %>)</span></td>
+          <td class="muted"><%= money(r.ly_day&.total) %> <span class="small">(<%= short_date(r.ly_date) %>)</span>
+              <%= outlier_flag(r.ly_outlier) %></td>
           <td><%= pct_badge(r.day&.total, r.ly_day&.total) %></td>
         </tr>
       <% end %>
