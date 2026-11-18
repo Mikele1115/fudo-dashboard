@@ -74,6 +74,93 @@
   </section>
 <% end %>
 
+<section class="card">
+  <div class="card--actions">
+    <h2>Buscar un insumo</h2>
+    <form method="get" action="<%= ingredients_path %>" class="toolbar">
+      <%= hidden_field_tag :period, a.period_key %>
+      <%= hidden_field_tag :all, "1" if @show_all %>
+      <input type="search" name="q" value="<%= @query %>" placeholder="Buscar insumo…"
+             autocomplete="off" aria-label="Buscar insumo">
+      <select name="sort" onchange="this.form.requestSubmit()">
+        <option value="rise"   <%= "selected" if @sort == "rise" %>>Mayor subida</option>
+        <option value="drop"   <%= "selected" if @sort == "drop" %>>Mayor bajada</option>
+        <option value="impact" <%= "selected" if @sort == "impact" %>>Impacto en pesos</option>
+        <option value="spend"  <%= "selected" if @sort == "spend" %>>Mayor gasto</option>
+        <option value="recent" <%= "selected" if @sort == "recent" %>>Compra más reciente</option>
+        <option value="name"   <%= "selected" if @sort == "name" %>>Nombre</option>
+      </select>
+      <button class="btn btn--light">Buscar</button>
+    </form>
+  </div>
+
+<%# La tabla entera son 121 filas y casi nunca se quieren todas: se busca UNO. Así que
+    por defecto no se dibuja ninguna, y aparecen solo las que coinciden con la búsqueda.
+    El listado completo sigue a un clic, con ?all=1, para cuando se quiera repasar. %>
+<% if @query.blank? && !@show_all %>
+  <p class="muted">
+    Escribe el nombre de un insumo para ver su precio actual, cómo viene evolucionando y sus compras.
+    <%= link_to "Ver los #{int(a.ingredients_count)} insumos",
+                ingredients_path(period: a.period_key, sort: @sort, all: 1) %>
+  </p>
+<% elsif @rows.empty? %>
+  <p class="muted">
+    Ningún insumo coincide con «<%= @query %>» en <%= a.period_label.downcase %>.
+    <%= link_to "Ver todos", ingredients_path(period: a.period_key, sort: @sort, all: 1) %>
+    · <%= link_to "Probar con todo el histórico", ingredients_path(period: "all", sort: @sort, q: @query) %>
+  </p>
+<% else %>
+  <p class="muted small">
+    <% if @query.present? %>
+      <%= int(@rows.size) %> de <%= int(a.ingredients_count) %> insumos
+      <%= @rows.size == 1 ? "coincide" : "coinciden" %> con «<%= @query %>».
+      <%= link_to "Limpiar", ingredients_path(period: a.period_key, sort: @sort) %>
+    <% else %>
+      Los <%= int(a.ingredients_count) %> insumos del período.
+      <%= link_to "Volver al buscador", ingredients_path(period: a.period_key, sort: @sort) %>
+    <% end %>
+    · Haz clic en uno para ver todas sus compras y la evolución de su precio.
+  </p>
+
+  <table class="table table--rows">
+    <thead>
+      <tr>
+        <th>Insumo</th>
+        <th>Evolución</th>
+        <th>Precio actual</th>
+        <th>Antes</th>
+        <th>Variación</th>
+        <th>Mín. / máx.</th>
+        <th>Compras</th>
+        <th>Gasto</th>
+        <th>Última</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @rows.each do |r| %>
+        <tr>
+          <td>
+            <%= link_to r.name, ingredient_path(r.ingredient_id, period: a.period_key) %>
+            <span class="muted small">/ <%= r.unit_label %></span>
+            <% if r.suspicious_count.positive? %>
+              <span class="tag tag--warn" title="<%= r.suspicious_count %> compra(s) con precio fuera de rango, excluidas del cálculo"><%= r.suspicious_count %> dudosa<%= "s" if r.suspicious_count > 1 %></span>
+            <% end %>
+          </td>
+          <td><%= price_sparkline(r.series) %></td>
+          <td><strong><%= money(r.recent_price) %></strong></td>
+          <td><%= money(r.baseline_price) %></td>
+          <td><%= price_change_badge(r.recent_price, r.baseline_price) %> <%= confidence_note(r) %></td>
+          <td class="muted small"><%= money(r.min_price) %> / <%= money(r.max_price) %></td>
+          <td><%= int(r.purchases_count) %></td>
+          <td><%= money(r.spend) %></td>
+          <td class="muted small"><%= r.last_date.strftime("%d/%m/%y") %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>
+</section>
+
 <%# Cada cuadro se abre y enseña de dónde sale su número. Ver _kpi.html.erb. %>
 <section class="kpis kpis--5">
   <%= render layout: "kpi", locals: {
@@ -322,92 +409,6 @@
   </table>
 </section>
 
-<section class="card">
-  <div class="card--actions">
-    <h2>Buscar un insumo</h2>
-    <form method="get" action="<%= ingredients_path %>" class="toolbar">
-      <%= hidden_field_tag :period, a.period_key %>
-      <%= hidden_field_tag :all, "1" if @show_all %>
-      <input type="search" name="q" value="<%= @query %>" placeholder="Buscar insumo…"
-             autocomplete="off" aria-label="Buscar insumo">
-      <select name="sort" onchange="this.form.requestSubmit()">
-        <option value="rise"   <%= "selected" if @sort == "rise" %>>Mayor subida</option>
-        <option value="drop"   <%= "selected" if @sort == "drop" %>>Mayor bajada</option>
-        <option value="impact" <%= "selected" if @sort == "impact" %>>Impacto en pesos</option>
-        <option value="spend"  <%= "selected" if @sort == "spend" %>>Mayor gasto</option>
-        <option value="recent" <%= "selected" if @sort == "recent" %>>Compra más reciente</option>
-        <option value="name"   <%= "selected" if @sort == "name" %>>Nombre</option>
-      </select>
-      <button class="btn btn--light">Buscar</button>
-    </form>
-  </div>
-
-<%# La tabla entera son 121 filas y casi nunca se quieren todas: se busca UNO. Así que
-    por defecto no se dibuja ninguna, y aparecen solo las que coinciden con la búsqueda.
-    El listado completo sigue a un clic, con ?all=1, para cuando se quiera repasar. %>
-<% if @query.blank? && !@show_all %>
-  <p class="muted">
-    Escribe el nombre de un insumo para ver su precio actual, cómo viene evolucionando y sus compras.
-    <%= link_to "Ver los #{int(a.ingredients_count)} insumos",
-                ingredients_path(period: a.period_key, sort: @sort, all: 1) %>
-  </p>
-<% elsif @rows.empty? %>
-  <p class="muted">
-    Ningún insumo coincide con «<%= @query %>» en <%= a.period_label.downcase %>.
-    <%= link_to "Ver todos", ingredients_path(period: a.period_key, sort: @sort, all: 1) %>
-    · <%= link_to "Probar con todo el histórico", ingredients_path(period: "all", sort: @sort, q: @query) %>
-  </p>
-<% else %>
-  <p class="muted small">
-    <% if @query.present? %>
-      <%= int(@rows.size) %> de <%= int(a.ingredients_count) %> insumos
-      <%= @rows.size == 1 ? "coincide" : "coinciden" %> con «<%= @query %>».
-      <%= link_to "Limpiar", ingredients_path(period: a.period_key, sort: @sort) %>
-    <% else %>
-      Los <%= int(a.ingredients_count) %> insumos del período.
-      <%= link_to "Volver al buscador", ingredients_path(period: a.period_key, sort: @sort) %>
-    <% end %>
-    · Haz clic en uno para ver todas sus compras y la evolución de su precio.
-  </p>
-
-  <table class="table table--rows">
-    <thead>
-      <tr>
-        <th>Insumo</th>
-        <th>Evolución</th>
-        <th>Precio actual</th>
-        <th>Antes</th>
-        <th>Variación</th>
-        <th>Mín. / máx.</th>
-        <th>Compras</th>
-        <th>Gasto</th>
-        <th>Última</th>
-      </tr>
-    </thead>
-    <tbody>
-      <% @rows.each do |r| %>
-        <tr>
-          <td>
-            <%= link_to r.name, ingredient_path(r.ingredient_id, period: a.period_key) %>
-            <span class="muted small">/ <%= r.unit_label %></span>
-            <% if r.suspicious_count.positive? %>
-              <span class="tag tag--warn" title="<%= r.suspicious_count %> compra(s) con precio fuera de rango, excluidas del cálculo"><%= r.suspicious_count %> dudosa<%= "s" if r.suspicious_count > 1 %></span>
-            <% end %>
-          </td>
-          <td><%= price_sparkline(r.series) %></td>
-          <td><strong><%= money(r.recent_price) %></strong></td>
-          <td><%= money(r.baseline_price) %></td>
-          <td><%= price_change_badge(r.recent_price, r.baseline_price) %> <%= confidence_note(r) %></td>
-          <td class="muted small"><%= money(r.min_price) %> / <%= money(r.max_price) %></td>
-          <td><%= int(r.purchases_count) %></td>
-          <td><%= money(r.spend) %></td>
-          <td class="muted small"><%= r.last_date.strftime("%d/%m/%y") %></td>
-        </tr>
-      <% end %>
-    </tbody>
-  </table>
-<% end %>
-</section>
 
 <% if a.to_review.any? %>
   <section class="card">
@@ -436,3 +437,4 @@
 <% end %>
 
 <% end %>
+

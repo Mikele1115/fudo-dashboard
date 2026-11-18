@@ -101,6 +101,18 @@ class IngredientsControllerTest < ActionDispatch::IntegrationTest
     assert_match "Escribe el nombre de un insumo", response.body
   end
 
+  test "el buscador va arriba, justo debajo de las alertas y antes de los cuadros" do
+    catalogo
+
+    get ingredients_path
+
+    cuerpo = response.body
+    assert_operator cuerpo.index("Buscar un insumo"), :<, cuerpo.index('class="kpis'),
+                    "el buscador tiene que ir antes de los cuadros"
+    assert_operator cuerpo.index('class="kpis'), :<, cuerpo.index("Por categoría"),
+                    "y los cuadros antes del resto"
+  end
+
   test "buscar deja solo los insumos que coinciden" do
     catalogo
 
