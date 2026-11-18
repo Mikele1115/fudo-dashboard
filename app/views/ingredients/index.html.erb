@@ -46,15 +46,29 @@
 <% if @alerts.any? %>
   <section class="card card--alert">
     <h2>⚠ <%= PriceAlert.headline(@alerts) %></h2>
+    <%# Una línea a la vista y el criterio a un clic: está todos los días en pantalla,
+        pero se lee una vez. Los umbrales salen de las constantes, no copiados a mano. %>
     <p class="muted small">
-      Compras que salieron bastante por encima de lo que se venía pagando.
-      Solo se avisa de insumos que pesan en el gasto y cuando el sobrecosto supera <%= money(PriceAlertDetector::MIN_OVERCOST) %>.
+      Compras muy por encima de lo habitual.
       <% if @alerts.any?(&:suspect?) %>
-        Las marcadas como <strong>revisar carga</strong> no son una subida: el monto coincide al peso con otra
-        compra al precio de siempre, así que lo que está mal es la cantidad.
+        Las de <strong>revisar carga</strong> no subieron de precio: lo mal cargado es la cantidad.
         <%= link_to "Revisar cargas", review_ingredients_path %>.
       <% end %>
     </p>
+    <details class="note">
+      <summary>Cuándo salta esta alerta</summary>
+      <ul>
+        <li>El precio sube más de <%= PriceAlertDetector::CHANGE_PCT.round %>% sobre la
+            <strong>mediana del último año</strong> de ese insumo, no sobre la compra anterior.</li>
+        <li>Esa compra costó de más al menos <%= money(PriceAlertDetector::MIN_OVERCOST) %>.</li>
+        <li>El insumo mueve al menos <%= money(PriceAlertDetector::MIN_SPEND) %> al año.</li>
+        <li>No se repite el aviso del mismo insumo en <%= PriceAlertDetector::COOLDOWN_DAYS %> días,
+            salvo que siga subiendo.</li>
+        <li>Si el <strong>monto</strong> de la compra coincide al peso con otra al precio de siempre,
+            el precio no subió: la cantidad está mal cargada, y se marca
+            <strong>revisar carga</strong> en vez de contarla como sobrecosto.</li>
+      </ul>
+    </details>
     <table class="table">
       <tr><th>Insumo</th><th>Se pagaba</th><th>Esta compra</th><th>Variación</th><th>Costó de más</th><th>Fecha</th><th></th></tr>
       <% @alerts.each do |a| %>

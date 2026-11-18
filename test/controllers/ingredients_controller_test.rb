@@ -3,6 +3,8 @@
 require "test_helper"
 
 class IngredientsControllerTest < ActionDispatch::IntegrationTest
+  include FormatHelper # para comparar importes con el mismo formato que la vista
+
   HOY = Date.new(2026, 11, 4)
 
   setup { sign_in_as(User.take) }
@@ -225,6 +227,25 @@ class IngredientsControllerTest < ActionDispatch::IntegrationTest
     assert_no_match(/21\.132/, response.body, "el sobrecosto no ocurrió: no se muestra como plata perdida")
   end
 
+  test "el criterio de la alerta se explica plegado, con los umbrales de verdad" do
+    buy(name: "Ndjua piccante", qty: 0.72, total: 34_020)
+    alerta(suspect: true)
+
+    get ingredients_path
+
+    aviso = css_select("section.card--alert").first
+    assert_operator aviso.css("p").first.text.strip.length, :<, 160,
+                    "lo que se ve siempre tiene que ser corto"
+    assert_select "details.note summary", text: "Cuándo salta esta alerta"
+    criterio = aviso.css("details.note").text
+    # Los umbrales salen de las constantes: si alguien las cambia, el texto cambia solo.
+    assert_match "#{PriceAlertDetector::CHANGE_PCT.round}%", criterio
+    assert_match money(PriceAlertDetector::MIN_OVERCOST), criterio
+    assert_match money(PriceAlertDetector::MIN_SPEND), criterio
+    assert_match "#{PriceAlertDetector::COOLDOWN_DAYS} días", criterio
+    assert_match "mediana del último año", criterio
+  end
+
   test "el panel sigue mostrando el sobrecosto de una subida real" do
     buy(name: "Ndjua piccante", qty: 0.72, total: 34_020)
     alerta(suspect: false)
@@ -234,6 +255,9 @@ class IngredientsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
     assert_select "h2", text: /Un insumo subió de precio/
     assert_match "21.132", response.body
-    assert_no_match(/revisar carga/, response.body)
+    # El criterio plegado siempre explica qué es "revisar carga"; lo que no puede
+    # aparecer es la etiqueta en una fila que sí es una subida real.
+    tabla = css_select("section.card--alert table").to_html
+    assert_no_match(/revisar carga/, tabla)
   end
 end
