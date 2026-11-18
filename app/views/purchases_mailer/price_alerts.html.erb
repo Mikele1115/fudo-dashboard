@@ -19,15 +19,16 @@
   <tr><td style="padding:20px 28px 8px;">
     <% sobrecosto = @alerts.sum(&:real_overcost) %>
     <% cargas = @alerts.select(&:suspect?) %>
+    <%# Corto a propósito: cada compra trae debajo su propia explicación, al lado de los
+        números que la sostienen. Repetirla aquí arriba y otra vez en el pie —como estaba—
+        era decir lo mismo tres veces. %>
     <p style="margin:0 0 14px;color:#374151;">
       <% if sobrecosto.positive? %>
-        <%= @alerts.size - cargas.size == 1 ? "Una compra salió" : "Hay compras que salieron" %>
-        bastante por encima de lo que se venía pagando: <strong><%= money(sobrecosto) %></strong> de sobrecosto.
+        <strong><%= money(sobrecosto) %></strong> de sobrecosto.
       <% end %>
       <% if cargas.any? %>
-        <%= cargas.size == 1 ? "Hay una compra" : "Hay #{cargas.size} compras" %>
-        donde el precio unitario salió disparado pero el monto coincide al peso con otra compra
-        al precio de siempre: ahí el precio no subió, la cantidad está mal cargada.
+        <%= cargas.size == 1 ? "Una compra no subió de precio" : "#{cargas.size} compras no subieron de precio" %>:
+        la cantidad está mal cargada.
         <a href="<%= review_ingredients_url %>" style="color:#92400e;">Revisar cargas</a>.
       <% end %>
     </p>
@@ -89,15 +90,13 @@
     <% end %>
   </td></tr>
 
+  <%# El criterio sí se queda: quien recibe esto no siempre entra al panel, donde está
+      explicado. Pero completo y en una línea, no repartido y a medias. %>
   <tr><td style="padding:8px 28px 24px;font-size:12px;color:#6b7280;border-top:1px solid #e5e7eb;">
-    El precio de referencia es la mediana de lo pagado por ese insumo en el último año,
-    sin contar las líneas mal cargadas. Precios netos, sin IVA.
-    Solo se avisa de insumos que pesan en el gasto anual y cuando el sobrecosto supera
-    <%= money(PriceAlertDetector::MIN_OVERCOST) %>.
-    <% if @alerts.any?(&:suspect?) %>
-      Una compra marcada como <strong>revisar carga</strong> no cuenta como sobrecosto:
-      el monto coincide con otra compra al precio habitual, así que la plata que salió es la misma.
-    <% end %>
+    Se avisa cuando el precio sube más de <%= PriceAlertDetector::CHANGE_PCT.round %>% sobre la
+    mediana del último año, la compra cuesta de más al menos
+    <%= money(PriceAlertDetector::MIN_OVERCOST) %> y el insumo mueve
+    <%= money(PriceAlertDetector::MIN_SPEND) %> al año. Precios netos, sin IVA.
   </td></tr>
 
 </table>

@@ -5,9 +5,8 @@
 Sobrecosto total: <%= money(sobrecosto) %>
 <% end -%>
 <% if cargas.any? %>
-<%= cargas.size == 1 ? "Una de estas compras" : "#{cargas.size} de estas compras" %> no es una subida de precio: el monto
-coincide al peso con otra compra al precio de siempre, así que lo que está mal
-cargado es la cantidad. Revisar en <%= review_ingredients_url %>
+<%= cargas.size == 1 ? "Una compra no subió de precio" : "#{cargas.size} compras no subieron de precio" %>: la cantidad está mal cargada.
+Revisar en <%= review_ingredients_url %>
 <% end -%>
 <% @alerts.each do |a| -%>
 
@@ -28,9 +27,6 @@ cargado es la cantidad. Revisar en <%= review_ingredients_url %>
 <% end -%>
 <% end -%>
 
-El precio de referencia es la mediana del último año, sin las líneas mal cargadas.
-Precios netos, sin IVA.
-<% if cargas.any? -%>
-Una compra marcada [REVISAR CARGA] no cuenta como sobrecosto: la plata que salió
-del local es la misma, lo que está mal es la cantidad.
-<% end -%>
+Se avisa cuando el precio sube más de <%= PriceAlertDetector::CHANGE_PCT.round %>% sobre la mediana del último año,
+la compra cuesta de más al menos <%= money(PriceAlertDetector::MIN_OVERCOST) %> y el insumo mueve
+<%= money(PriceAlertDetector::MIN_SPEND) %> al año. Precios netos, sin IVA.

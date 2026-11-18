@@ -3,6 +3,8 @@
 require "test_helper"
 
 class PurchasesMailerTest < ActionMailer::TestCase
+  include FormatHelper # para comparar importes con el mismo formato que la plantilla
+
   setup do
     ENV["MAIL_TO"]   = "duena@example.com"
     ENV["MAIL_FROM"] = "informes@example.com"
@@ -69,6 +71,25 @@ class PurchasesMailerTest < ActionMailer::TestCase
     assert_match "Un insumo subió de precio y una carga para revisar", correo.subject
     assert_match "Alerta de precios", correo.subject, "hay una subida real: no es solo revisar cargas"
     assert_match "126.000", correo.html_part.body.to_s, "el sobrecosto real se sigue sumando"
+  end
+
+  test "el criterio va una sola vez y completo, no repartido y a medias" do
+    a = alert(suspect: true)
+
+    correo = PurchasesMailer.price_alerts([a.id])
+
+    [correo.html_part.body.to_s, correo.text_part.body.to_s].each do |cuerpo|
+      texto = cuerpo.gsub(/<[^>]+>/, " ").gsub(/\s+/, " ")
+      # Dos menciones y no más: la de arriba es el titular con el enlace para actuar, y la
+      # de abajo va pegada a los números que la sostienen. La tercera, en el pie, sobraba.
+      assert_equal 2, texto.scan(/mal cargada/).size + texto.scan(/corregir en Fudo es la cantidad/).size
+      pie = texto.split("Se avisa cuando el precio sube").last
+      assert_no_match(/cantidad/, pie, "el pie volvía a explicar lo mismo por tercera vez")
+      # El criterio sí se queda: quien lo recibe no siempre puede abrir el panel.
+      assert_match "#{PriceAlertDetector::CHANGE_PCT.round}%", texto
+      assert_match money(PriceAlertDetector::MIN_OVERCOST), texto
+      assert_match money(PriceAlertDetector::MIN_SPEND), texto
+    end
   end
 
   # ---------- quién recibe cada correo ----------
