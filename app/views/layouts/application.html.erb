@@ -13,49 +13,60 @@
   </head>
 
   <body>
-    <header class="topbar">
-      <div class="topbar__inner">
-        <div class="brand">
-          <span class="brand__logo" aria-hidden="true">🍕</span>
-          <span class="brand__text">
-            <span class="brand__name"><%= AppSettings.restaurant_name %></span>
-            <span class="brand__sub">Dashboard de ventas</span>
-          </span>
-        </div>
-        <% if authenticated? %>
-        <nav class="nav">
-          <%= link_to "Dashboard", root_path, class: ("nav__link--active" if controller_name == "dashboard") %>
-          <%= link_to "Historial", history_path, class: ("nav__link--active" if controller_name == "history") %>
-          <%= link_to "Insumos", ingredients_path, class: ("nav__link--active" if controller_name == "ingredients") %>
-        </nav>
-        <div class="topbar__actions">
-          <%= render "shared/sync_status" %>
-          <%= button_to "Sincronizar", sync_path, params: { date: params[:date] }.compact, class: "btn btn--light", form_class: "inline",
-                        disabled: last_sync&.running? %>
-          <span class="topbar__user"><%= Current.user.email_address %></span>
-          <%= button_to "Salir", session_path, method: :delete, class: "btn btn--ghost btn--dark", form_class: "inline" %>
-        </div>
-        <% end %>
+    <%# Sin sesión no hay barra lateral: la pantalla de entrada va sola y centrada. %>
+    <% if authenticated? %>
+      <div class="shell">
+        <aside class="sidebar">
+          <div class="brand">
+            <span class="brand__logo" aria-hidden="true">🍕</span>
+            <span class="brand__text">
+              <span class="brand__name"><%= AppSettings.restaurant_name %></span>
+              <span class="brand__sub">Dashboard</span>
+            </span>
+          </div>
+
+          <nav class="nav">
+            <%= link_to root_path, class: ["nav__link", ("nav__link--active" if controller_name == "dashboard")] do %>
+              <%= icon(:home) %><span>Dashboard</span>
+            <% end %>
+            <%= link_to history_path, class: ["nav__link", ("nav__link--active" if controller_name == "history")] do %>
+              <%= icon(:history) %><span>Historial</span>
+            <% end %>
+            <%= link_to ingredients_path, class: ["nav__link", ("nav__link--active" if %w[ingredients ingredient_categories].include?(controller_name))] do %>
+              <%= icon(:box) %><span>Insumos</span>
+            <% end %>
+          </nav>
+
+          <div class="sidebar__foot">
+            <%= render "shared/sync_status" %>
+            <%= button_to sync_path, params: { date: params[:date] }.compact,
+                          class: "btn btn--primary btn--block", form_class: "sidebar__form",
+                          disabled: last_sync&.running? do %>
+              <%= icon(:refresh, size: 16) %> Sincronizar
+            <% end %>
+            <div class="sidebar__user">
+              <span class="avatar" aria-hidden="true"><%= Current.user.email_address.to_s[0, 1].upcase %></span>
+              <span class="sidebar__email"><%= Current.user.email_address %></span>
+            </div>
+            <%= button_to "Cerrar sesión", session_path, method: :delete,
+                          class: "btn btn--ghost btn--block btn--small", form_class: "sidebar__form" %>
+          </div>
+        </aside>
+
+        <main class="main">
+          <%= render "shared/flashes" %>
+          <%= yield %>
+          <footer class="footer">
+            Fuente: Fudo (ventas con estado cerrado). <%= cutoff_note %>
+            Zona horaria: <%= AppSettings.timezone_name %>.
+          </footer>
+        </main>
       </div>
-    </header>
-
-    <main class="container">
-      <% if flash[:notice] %><div class="flash flash--ok"><%= flash[:notice] %></div><% end %>
-      <% if flash[:alert]  %><div class="flash flash--error"><%= flash[:alert] %></div><% end %>
-
-      <% if authenticated? && !AppSettings.fudo_configured? %>
-        <div class="flash flash--warn">
-          <strong>Falta configurar Fudo.</strong> Completa <code><%= AppSettings.fudo_missing.join("</code> y <code>").html_safe %></code>
-          en el archivo <code>.env</code> y reinicia el servidor.
-        </div>
-      <% end %>
-
-      <%= yield %>
-    </main>
-
-    <footer class="footer">
-      Fuente: Fudo (ventas con estado cerrado). <%= cutoff_note %>
-      Zona horaria: <%= AppSettings.timezone_name %>.
-    </footer>
+    <% else %>
+      <main class="main main--bare">
+        <%= render "shared/flashes" %>
+        <%= yield %>
+      </main>
+    <% end %>
   </body>
 </html>

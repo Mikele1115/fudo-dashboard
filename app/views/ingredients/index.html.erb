@@ -181,7 +181,7 @@
 <%# Cada cuadro se abre y enseña de dónde sale su número. Ver _kpi.html.erb. %>
 <section class="kpis kpis--5">
   <%= render layout: "shared/kpi", locals: {
-        label: "Gasto en insumos", value: money(a.total_spend),
+        icon: :money, tono: "blue",  label: "Gasto en insumos", value: money(a.total_spend),
         delta: "#{a.period_label.downcase}, sin IVA",
         hint:  "En qué categorías de Fudo se fue la plata. #{int(a.ingredients_count)} insumos, #{int(a.purchases_count)} compras." } do %>
     <table class="table table--compact">
@@ -202,7 +202,7 @@
   <% end %>
 
   <%= render layout: "shared/kpi", locals: {
-        label: "La canasta",
+        icon: :basket, tono: "violet", label: "La canasta",
         value: a.basket_change_pct ? pct_text(a.basket_change_pct + 100, 100) : "—",
         value_class: a.basket_change_pct.nil? ? "" : (a.basket_change_pct.positive? ? "txt--bad" : "txt--good"),
         delta: "ponderada por gasto, sobre #{int(a.reliable_rows.size)} insumos" +
@@ -236,7 +236,7 @@
 
   <% impact = a.spend_impact_total %>
   <%= render layout: "shared/kpi", locals: {
-        label: impact.negative? ? "Ahorro" : "Costó de más",
+        icon: :up, tono: "green", label: impact.negative? ? "Ahorro" : "Costó de más",
         value: money(impact.abs),
         value_class: impact.negative? ? "txt--good" : "txt--bad",
         delta: "comprando el mismo volumen al precio de ahora",
@@ -269,7 +269,7 @@
   <% end %>
 
   <%= render layout: "shared/kpi", locals: {
-        label: "Subieron", value: int(a.rising.size),
+        icon: :chart, tono: "amber", label: "Subieron", value: int(a.rising.size),
         delta: "#{int(a.falling.size)} bajaron",
         hint:  "Un insumo cuenta como movido cuando su variación pasa de ±#{number_with_precision(IngredientPrices::STABLE_PCT, precision: 0)}%; " \
                "por debajo se considera precio estable." } do %>
@@ -286,7 +286,7 @@
   <% end %>
 
   <%= render layout: "shared/kpi", locals: {
-        label: "A revisar", value: int(a.suspicious_count),
+        icon: :alert, tono: "rose", label: "A revisar", value: int(a.suspicious_count),
         delta: "líneas con precio dudoso",
         hint:  "Líneas que no entran en ninguna mediana: o el precio se aleja más de #{IngredientPrices::OUTLIER_FACTOR.round}x " \
                "de lo normal, o el monto cuadra con otra compra y la cantidad no. Su plata sí cuenta en el gasto. " \

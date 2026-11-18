@@ -24,14 +24,14 @@
 
 <section class="kpis kpis--6">
   <%= render layout: "shared/kpi", locals: {
-        label: "Ventas del mes", value: money(p.total),
+        icon: :money, tono: "blue", label: "Ventas del mes", value: money(p.total),
         delta: safe_join([pct_badge(p.total, lp.total), " vs. #{money(lp.total)} en #{r.year - 1}"]),
         hint:  "De qué días vive el mes. El día a día de abajo no deja ver que un sábado vale por dos martes." } do %>
     <%= render "history/weekdays", report: r, columna: :venta %>
   <% end %>
 
   <%= render layout: "shared/kpi", locals: {
-        label: "Venta neta (sin IVA)", value: money(p.net),
+        icon: :receipt, tono: "green", label: "Venta neta (sin IVA)", value: money(p.net),
         delta: safe_join([pct_badge(p.net, lp.net), " vs. #{money(lp.net)}"]),
         hint:  "Qué hay dentro de lo cobrado." } do %>
     <table class="table table--compact">
@@ -47,14 +47,14 @@
   <% end %>
 
   <%= render layout: "shared/kpi", locals: {
-        label: "Tickets", value: int(p.tickets),
+        icon: :receipt, tono: "amber", label: "Tickets", value: int(p.tickets),
         delta: safe_join([pct_badge(p.tickets, lp.tickets), " vs. #{int(lp.tickets)}"]),
         hint:  "Cuántas mesas y pedidos entran cada día de la semana." } do %>
     <%= render "history/weekdays", report: r, columna: :tickets %>
   <% end %>
 
   <%= render layout: "shared/kpi", locals: {
-        label: "Ticket promedio", value: money(p.avg_ticket),
+        icon: :chart, tono: "violet", label: "Ticket promedio", value: money(p.avg_ticket),
         delta: safe_join([pct_badge(p.avg_ticket, lp.avg_ticket), " vs. #{money(lp.avg_ticket)}"]),
         hint:  "Qué días tiran del promedio hacia arriba y cuáles hacia abajo." } do %>
     <div class="grid-2">
@@ -70,7 +70,7 @@
   <% end %>
 
   <%= render layout: "shared/kpi", locals: {
-        label: "Ticket por persona", value: money(p.avg_per_person),
+        icon: :person, tono: "rose", label: "Ticket por persona", value: money(p.avg_per_person),
         delta: content_tag(:span, "#{int(p.people)} comensales", class: "muted"),
         hint:  "No es la venta del mes dividida entre los comensales: solo cuentan las ventas de salón donde se registró cuánta gente había." } do %>
     <table class="table table--compact">
@@ -90,7 +90,7 @@
   <% end %>
 
   <%= render layout: "shared/kpi", locals: {
-        label: "Venta promedio por día",
+        icon: :calendar, tono: "slate", label: "Venta promedio por día",
         value: money(p.days.positive? ? p.total / p.days : nil),
         delta: content_tag(:span, "#{p.days} días con venta de #{r.rows.size}", class: "muted"),
         hint:  "El promedio solo cuenta los días con venta: un día cerrado no baja la media." } do %>

@@ -27,32 +27,38 @@
 
 <section class="kpis kpis--6">
   <div class="kpi">
+    <%= kpi_icon(:money, tono: "blue") %>
     <div class="kpi__label">Venta bruta</div>
     <div class="kpi__value"><%= money(d&.total) %></div>
     <div class="kpi__delta"><%= pct_badge(d&.total, ly&.total) %> <span class="muted">vs. año anterior</span></div>
   </div>
   <div class="kpi">
+    <%= kpi_icon(:receipt, tono: "green") %>
     <div class="kpi__label">Venta neta (sin IVA)</div>
     <div class="kpi__value"><%= money(d&.net) %></div>
     <div class="kpi__delta"><%= pct_badge(d&.net, ly&.net) %> <span class="muted">vs. año anterior</span></div>
   </div>
   <div class="kpi">
+    <%= kpi_icon(:receipt, tono: "amber") %>
     <div class="kpi__label">Tickets</div>
     <div class="kpi__value"><%= int(d&.tickets) %></div>
     <div class="kpi__delta"><%= pct_badge(d&.tickets, ly&.tickets) %> <span class="muted">vs. año anterior</span></div>
   </div>
   <div class="kpi">
+    <%= kpi_icon(:chart, tono: "violet") %>
     <div class="kpi__label">Ticket promedio</div>
     <div class="kpi__value"><%= money(d&.avg_ticket) %></div>
     <div class="kpi__delta"><%= pct_badge(d&.avg_ticket, ly&.avg_ticket) %> <span class="muted">vs. año anterior</span></div>
   </div>
   <div class="kpi">
+    <%= kpi_icon(:person, tono: "rose") %>
     <div class="kpi__label">Ticket por persona</div>
     <div class="kpi__value"><%= money(d&.avg_per_person) %></div>
     <div class="kpi__delta"><%= pct_badge(d&.avg_per_person, ly&.avg_per_person) %> <span class="muted"><%= int(d&.people) %> comensales</span></div>
   </div>
   <% mtd = m.periods[1] %>
   <div class="kpi">
+    <%= kpi_icon(:calendar, tono: "slate") %>
     <div class="kpi__label">Mes en curso</div>
     <div class="kpi__value"><%= money(mtd.current.total) %></div>
     <div class="kpi__delta"><%= pct_badge(mtd.current.total, mtd.ly.total) %> <span class="muted">vs. mismo período <%= m.report_date.year - 1 %></span></div>

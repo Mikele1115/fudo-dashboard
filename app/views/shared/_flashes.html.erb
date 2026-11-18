@@ -1,0 +1,11 @@
+<%# Avisos de la aplicación. Estaban escritos dos veces en el layout; ahora viven aquí. %>
+<% if flash[:notice] %><div class="flash flash--ok"><%= flash[:notice] %></div><% end %>
+<% if flash[:alert]  %><div class="flash flash--error"><%= flash[:alert] %></div><% end %>
+
+<% if authenticated? && !AppSettings.fudo_configured? %>
+  <div class="flash flash--warn">
+    <strong>Falta configurar Fudo.</strong>
+    Completa <code><%= AppSettings.fudo_missing.join("</code> y <code>").html_safe %></code>
+    en el archivo <code>.env</code> y reinicia el servidor.
+  </div>
+<% end %>
