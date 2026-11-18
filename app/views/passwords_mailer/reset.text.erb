@@ -1,4 +1,11 @@
-You can reset your password on
+Tienes una cuenta en el panel de <%= @name %>, donde están las ventas del
+local y el seguimiento de los precios de los insumos.
+
+Elige tu contraseña aquí:
 <%= edit_password_url(@user.password_reset_token) %>
 
-This link will expire in <%= distance_of_time_in_words(0, @user.password_reset_token_expires_in) %>.
+El enlace caduca en <%= distance_of_time_in_words(0, @user.password_reset_token_expires_in) %>. Si caduca, entra en
+<%= new_password_url %> y pide otro.
+
+Si no esperabas este correo, ignóralo: sin abrir ese enlace no se crea
+ninguna contraseña.
