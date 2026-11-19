@@ -1,11 +1,14 @@
+<%# El plazo se escribe en castellano a mano: distance_of_time_in_words sigue el locale
+    de la aplicación, que es :en, y dejaba un "caduca en 1 day" en medio del texto. %>
+<% horas = (@user.password_reset_token_expires_in / 3600.0).round %>
 <p>
   Tienes una cuenta en el panel de <strong><%= @name %></strong>, donde están las ventas
   del local y el seguimiento de los precios de los insumos.
 </p>
 <p>
   <%= link_to "Elige tu contraseña", edit_password_url(@user.password_reset_token) %>.
-  El enlace caduca en <%= distance_of_time_in_words(0, @user.password_reset_token_expires_in) %>;
-  si caduca, pide otro en <%= link_to "esta página", new_password_url %>.
+  El enlace caduca en <%= horas %> horas; si caduca, pide otro en
+  <%= link_to "esta página", new_password_url %>.
 </p>
 <p style="color:#6b7280;font-size:13px;">
   Si no esperabas este correo, ignóralo: sin abrir ese enlace no se crea ninguna contraseña.
