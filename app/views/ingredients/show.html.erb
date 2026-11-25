@@ -2,7 +2,7 @@
 
 <section class="page-head">
   <div>
-    <h1><%= r.name %></h1>
+    <h1><%= r.name %> <%= fudo_edit_link(:ingredient, r.ingredient_id, titulo: "Corregir este insumo en Fudo") %></h1>
     <p class="muted">
       Precio por <%= r.unit_label %>, neto sin IVA.
       <%= r.purchases_count %> compras entre el <%= @prices.from.strftime("%d/%m/%Y") %> y el <%= @prices.to.strftime("%d/%m/%Y") %>.

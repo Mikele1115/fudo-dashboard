@@ -100,6 +100,7 @@
       <% @alerts.each do |a| %>
         <tr>
           <td><%= link_to a.ingredient_name, ingredient_path(a.fudo_ingredient_id) %>
+              <%= fudo_edit_link(:ingredient, a.fudo_ingredient_id) %>
               <span class="muted small">/ <%= a.unit_label %></span>
               <%= alert_suspect_tag(a) %></td>
           <td><%= money(a.baseline_price) %></td>
@@ -199,6 +200,7 @@
             <%= "hidden" unless visibles.include?(r) %>>
           <td>
             <%= link_to r.name, ingredient_path(r.ingredient_id, period: a.period_key) %>
+            <%= fudo_edit_link(:ingredient, r.ingredient_id) %>
             <span class="muted small">/ <%= r.unit_label %></span>
             <% if r.suspicious_count.positive? %>
               <span class="tag tag--warn" title="<%= r.suspicious_count %> compra(s) con precio fuera de rango, excluidas del cálculo"><%= r.suspicious_count %> dudosa<%= "s" if r.suspicious_count > 1 %></span>

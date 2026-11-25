@@ -5,6 +5,12 @@ module AppSettings
   module_function
 
   def restaurant_name = env("RESTAURANT_NAME", "Restaurante")
+
+  # Raíz de la aplicación web de Fudo, para enlazar a la pantalla de edición de un
+  # producto o un insumo. No sale de la API: es la URL que se ve en el navegador al
+  # editar uno. Configurable por si Fudo cambia de dominio y hay que arreglarlo sin
+  # tocar código.
+  def fudo_app_url = env("FUDO_APP_URL", "https://app-v2.fu.do/app/#!")
   def timezone_name   = env("TZ_NAME", "America/Santiago")
   def timezone        = TZInfo::Timezone.get(timezone_name)
   def cutoff_hour     = env("BUSINESS_DAY_CUTOFF_HOUR", "0").to_i

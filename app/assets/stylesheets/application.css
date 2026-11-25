@@ -298,3 +298,12 @@ details.kpi[open] { grid-column: 1 / -1; }
   .acc__row span:nth-child(3), .acc__row span:nth-child(5) { display: none; }
 }
 .acc__body--tight { padding: 2px 0 8px 18px; }
+
+/* Enlace a la pantalla de Fudo donde se corrige el dato. Discreto: va al lado del
+   nombre en tablas que ya van llenas, y solo se destaca al pasar por encima. */
+.fudo-link { color: var(--muted); font-size: 12px; margin-left: 4px; text-decoration: none; }
+.fudo-link:hover { color: var(--primary); text-decoration: none; }
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}

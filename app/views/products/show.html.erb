@@ -20,6 +20,7 @@
         <% @grupo.canales.sort_by { |c| -c.unidades }.each do |c| %>
           <tr>
             <td><strong><%= c.label %></strong>
+                <%= fudo_edit_link(:product, c.product.fudo_product_id, titulo: "Corregir este canal en Fudo") %>
                 <%= content_tag(:span, "inactivo", class: "tag tag--warn",
                       title: "Marcado como inactivo en Fudo, pero sigue vendiendo") unless c.product.active %></td>
             <td class="muted"><%= money(c.carta) %></td>

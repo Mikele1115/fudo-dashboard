@@ -89,7 +89,8 @@
         <% principal = g.vendidos.max_by(&:unidades) %>
         <tr data-filtro-target="row" data-nombre="<%= sin_acentos(g.name) %>"
             <%= "hidden" unless visibles.include?(g) %>>
-          <td><%= link_to g.name, product_path(principal.product.fudo_product_id, period: a.period_key) %></td>
+          <td><%= link_to g.name, product_path(principal.product.fudo_product_id, period: a.period_key) %>
+              <%= fudo_edit_link(:product, principal.product.fudo_product_id) %></td>
           <td class="muted small"><%= g.vendidos.map(&:label).join(" · ") %></td>
           <td><strong><%= money(principal.cobrado) %></strong>
               <%= content_tag(:span, "≠ carta", class: "tag tag--warn",
@@ -158,7 +159,8 @@
           <% a.descuadrados.first(12).each do |g| %>
             <% g.canales.select { |c| c.fiable? && c.desvio_pct && c.desvio_pct.abs >= 1 }.each do |c| %>
               <tr>
-                <td><%= link_to g.name, product_path(c.product.fudo_product_id, period: a.period_key) %></td>
+                <td><%= link_to g.name, product_path(c.product.fudo_product_id, period: a.period_key) %>
+                    <%= fudo_edit_link(:product, c.product.fudo_product_id, titulo: "Corregir el precio de carta en Fudo") %></td>
                 <td class="muted"><%= c.label %></td>
                 <td class="num muted"><%= money(c.carta) %></td>
                 <td class="num"><%= money(c.cobrado) %></td>

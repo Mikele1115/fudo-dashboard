@@ -118,7 +118,7 @@
       <% @findings.each do |f| %>
         <tr>
           <td class="muted"><%= f.on.strftime("%d/%m/%Y") %></td>
-          <td><%= link_to f.name, ingredient_path(f.ingredient_id) %></td>
+          <td><%= link_to f.name, ingredient_path(f.ingredient_id) %> <%= fudo_edit_link(:ingredient, f.ingredient_id, titulo: "Corregir la cantidad en Fudo") %></td>
           <td class="muted small"><%= f.provider.presence || "—" %></td>
           <td>
             <strong><%= cant.(f.loaded_quantity) %></strong> <%= f.unit %>

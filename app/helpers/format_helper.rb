@@ -142,6 +142,30 @@ module FormatHelper
              aria: { label: "El día de referencia no fue un día corriente" })
   end
 
+  # Enlace a la pantalla de Fudo donde se corrige un producto o un insumo.
+  #
+  #   fudo_edit_url(:product, 558)    -> .../app/#!/products/558/edit
+  #   fudo_edit_url(:ingredient, 82)  -> .../app/#!/ingredients/82/edit
+  #
+  # El id es SIEMPRE el de Fudo (fudo_product_id, fudo_ingredient_id), no el nuestro.
+  FUDO_RECURSOS = { product: "products", ingredient: "ingredients" }.freeze
+
+  def fudo_edit_url(tipo, fudo_id)
+    recurso = FUDO_RECURSOS.fetch(tipo.to_sym)
+    "#{AppSettings.fudo_app_url}/#{recurso}/#{fudo_id}/edit"
+  end
+
+  # Icono enlazado, para ponerlo junto al nombre en las tablas sin robar ancho.
+  # Abre en otra pestaña: corriges en Fudo y vuelves al panel donde lo dejaste.
+  def fudo_edit_link(tipo, fudo_id, titulo: nil)
+    return "" if fudo_id.blank?
+
+    link_to fudo_edit_url(tipo, fudo_id), class: "fudo-link", target: "_blank",
+            rel: "noopener", title: titulo || "Corregir en Fudo" do
+      tag.span("↗", aria: { hidden: true }) + tag.span("Fudo", class: "sr-only")
+    end
+  end
+
   def cutoff_note
     cutoff = AppSettings.cutoff_hour
     return "" if cutoff.zero?
