@@ -33,11 +33,18 @@ class ProductPrices
                      :antes, :antes_n, :ahora, :ahora_n, keyword_init: true) do
     def label = channel.presence || "único"
 
-    # Cuánto se separa lo cobrado del precio de carta. nil si falta alguno de los dos.
+    # Cuánto se separa del precio de carta lo que se cobra AHORA.
+    #
+    # Contra `ahora` y no contra `cobrado`, que es la mediana del período entero. Con
+    # 12 meses esa mediana recoge también lo que valía antes de una subida, así que un
+    # producto al que le subiste el precio en mayo aparecía como "descuadrado" sin
+    # estarlo: la Coca Cola Zero daba −14% solo porque pasó de $2.500 a $2.900 a mitad
+    # de año. El catálogo dice el precio de hoy; hay que compararlo contra hoy.
     def desvio_pct
-      return nil if carta.nil? || carta.zero? || cobrado.nil?
+      referencia = ahora || cobrado
+      return nil if carta.nil? || carta.zero? || referencia.nil?
 
-      (cobrado - carta) / carta * 100.0
+      (referencia - carta) / carta * 100.0
     end
 
     # Cuánto se movió el precio cobrado DENTRO del período.

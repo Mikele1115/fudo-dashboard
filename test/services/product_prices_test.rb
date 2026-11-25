@@ -65,6 +65,22 @@ class ProductPricesTest < ActiveSupport::TestCase
     assert_not g.cuadra?
   end
 
+  test "una subida a mitad de período no se confunde con una carta desactualizada" do
+    # La Coca Cola pasó de $2.500 a $2.900 y la carta dice $2.900: está AL DÍA. Comparar
+    # la carta contra la mediana de los 12 meses la daba por descuadrada en -14%.
+    producto(1, "Coca cola Zero", 2_900)
+    6.times { |i| vender(1, "Coca cola Zero", 2_500, on: HOY - 170 + i) }
+    4.times { |i| vender(1, "Coca cola Zero", 2_900, on: HOY - i) }
+
+    g = ProductPrices.new(period: "6", to: HOY).con_ventas.find { |x| x.name == "Coca cola Zero" }
+    c = g.canales.first
+
+    assert_equal 2_500, c.cobrado, "la mediana del período sí recoge el precio viejo"
+    assert_equal 2_900, c.ahora
+    assert_in_delta 0.0, c.desvio_pct, 0.01, "contra la carta se compara lo que se cobra ahora"
+    assert g.cuadra?, "subir un precio y actualizar la carta no es estar descuadrado"
+  end
+
   test "la variación compara los dos extremos del período, no compras sueltas" do
     producto(1, "Coca cola Original", 2_900)
     4.times { |i| vender(1, "Coca cola Original", 2_500, on: HOY - 170 + i) }
