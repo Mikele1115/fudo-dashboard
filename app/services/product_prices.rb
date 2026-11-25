@@ -29,22 +29,26 @@ class ProductPrices
   # Por debajo de esto es el mismo precio: redondeos y algún agregado suelto.
   STABLE_PCT = 1.0
 
+  # "¿Está mi carta al día?" es una pregunta sobre HOY, no sobre el período elegido.
+  # Por eso el desvío contra la carta mira siempre esta ventana fija, dé igual que
+  # estés viendo 1 mes o 2 años. Con 12 meses entraban platos que no se venden desde
+  # hace medio año: 72 en la lista en vez de los 22 que están vivos.
+  VENTANA_CARTA = 30
+
   Canal = Struct.new(:channel, :product, :carta, :cobrado, :unidades, :precios_distintos,
-                     :antes, :antes_n, :ahora, :ahora_n, keyword_init: true) do
+                     :antes, :antes_n, :ahora, :ahora_n, :reciente, :reciente_n,
+                     keyword_init: true) do
     def label = channel.presence || "único"
 
-    # Cuánto se separa del precio de carta lo que se cobra AHORA.
-    #
-    # Contra `ahora` y no contra `cobrado`, que es la mediana del período entero. Con
-    # 12 meses esa mediana recoge también lo que valía antes de una subida, así que un
-    # producto al que le subiste el precio en mayo aparecía como "descuadrado" sin
-    # estarlo: la Coca Cola Zero daba −14% solo porque pasó de $2.500 a $2.900 a mitad
-    # de año. El catálogo dice el precio de hoy; hay que compararlo contra hoy.
+    # Cuánto se separa del precio de carta lo que se cobra en los últimos VENTANA_CARTA
+    # días. Ni `cobrado` (la mediana del período entero: con 12 meses recoge lo que
+    # valía antes de una subida y daba por descuadrada a la Coca Cola Zero por pasar de
+    # $2.500 a $2.900 en mayo) ni `ahora` (que se mueve con el desplegable del período).
+    # El catálogo dice el precio de hoy; se compara contra hoy.
     def desvio_pct
-      referencia = ahora || cobrado
-      return nil if carta.nil? || carta.zero? || referencia.nil?
+      return nil if carta.nil? || carta.zero? || reciente.nil?
 
-      (referencia - carta) / carta * 100.0
+      (reciente - carta) / carta * 100.0
     end
 
     # Cuánto se movió el precio cobrado DENTRO del período.
@@ -56,6 +60,10 @@ class ProductPrices
 
     def fiable?     = unidades >= MIN_UNIDADES
     def comparable? = change_pct && [antes_n.to_i, ahora_n.to_i].min >= MIN_CONFIDENCE
+
+    # Para la pregunta de la carta solo cuentan las ventas recientes: un plato que no se
+    # vende desde hace medio año no dice nada sobre si su precio está bien hoy.
+    def carta_fiable? = reciente_n.to_i >= MIN_UNIDADES
 
     def trend
       return "sin comparación" unless comparable?
@@ -79,7 +87,14 @@ class ProductPrices
     def vendidos    = canales.select { |c| c.unidades.positive? }
 
     # Un grupo "cuadra" cuando todos sus canales se cobran a su precio de carta.
-    def cuadra? = canales.select(&:fiable?).all? { |c| c.desvio_pct && c.desvio_pct.abs < 1 }
+    # Un grupo "cuadra" cuando todo lo que se vende HOY se cobra a su precio de carta.
+    # Los canales sin ventas recientes no opinan: no se sabe y no se inventa.
+    def cuadra?
+      vivos = canales.select(&:carta_fiable?)
+      return true if vivos.empty?
+
+      vivos.all? { |c| c.desvio_pct && c.desvio_pct.abs < 1 }
+    end
 
     # Variación del grupo: la de sus canales, ponderada por unidades vendidas, y solo
     # con los canales fiables. Un canal que vendió 3 unidades no puede mover el número.
@@ -164,13 +179,22 @@ class ProductPrices
   def canal_de(producto, ventas, previas)
     precios = ventas.map { |(_, p)| p.to_f }
     antes, ahora = extremos(ventas, previas)
+    reciente = ventas_recientes[producto.fudo_product_id] || []
     Canal.new(
       channel: producto.channel, product: producto, carta: producto.price&.to_f,
       cobrado: ComparisonWindow.median(precios), unidades: precios.size,
       precios_distintos: precios.uniq.size,
       antes: ComparisonWindow.median(antes), antes_n: antes.size,
-      ahora: ComparisonWindow.median(ahora), ahora_n: ahora.size
+      ahora: ComparisonWindow.median(ahora), ahora_n: ahora.size,
+      reciente: ComparisonWindow.median(reciente), reciente_n: reciente.size
     )
+  end
+
+  # Lo cobrado en los últimos VENTANA_CARTA días, al margen del período elegido.
+  # Es la referencia para saber si el precio de carta está al día.
+  def ventas_recientes
+    @ventas_recientes ||= agrupar(@to - (VENTANA_CARTA - 1), @to)
+                          .transform_values { |filas| filas.map(&:last) }
   end
 
   # Los dos extremos que se comparan, como en los insumos: las ventas de los primeros

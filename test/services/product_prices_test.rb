@@ -81,6 +81,31 @@ class ProductPricesTest < ActiveSupport::TestCase
     assert g.cuadra?, "subir un precio y actualizar la carta no es estar descuadrado"
   end
 
+  test "el desvío contra la carta mira los últimos 30 días, no el período elegido" do
+    # Un plato que se vendía mal cargado hace meses y hoy ya no se vende no puede
+    # seguir en la lista: la pregunta «¿está mi carta al día?» es sobre hoy.
+    producto(1, "Viejo PLATO", 10_000)
+    8.times { |i| vender(1, "Viejo PLATO", 13_000, on: HOY - 200 + i) } # descuadrado, pero viejo
+    producto(2, "Vivo PLATO", 10_000)
+    8.times { |i| vender(2, "Vivo PLATO", 13_000, on: HOY - i) }        # descuadrado y vivo
+
+    descuadrados = ProductPrices.new(period: "12", to: HOY).descuadrados.map(&:name)
+
+    # Los grupos van por el nombre sin el canal.
+    assert_includes descuadrados, "Vivo"
+    assert_not_includes descuadrados, "Viejo", "no se vende hace medio año"
+  end
+
+  test "la ventana de la carta no cambia aunque cambies el período" do
+    producto(1, "Margherita PLATO", 10_000)
+    8.times { |i| vender(1, "Margherita PLATO", 12_000, on: HOY - i) }
+
+    %w[1 3 12].each do |periodo|
+      c = ProductPrices.new(period: periodo, to: HOY).con_ventas.first.canales.first
+      assert_in_delta 20.0, c.desvio_pct, 0.01, "con período #{periodo} el desvío debería ser el mismo"
+    end
+  end
+
   test "la variación compara los dos extremos del período, no compras sueltas" do
     producto(1, "Coca cola Original", 2_900)
     4.times { |i| vender(1, "Coca cola Original", 2_500, on: HOY - 170 + i) }

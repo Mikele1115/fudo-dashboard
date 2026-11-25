@@ -149,7 +149,7 @@
   <%= render layout: "shared/kpi", locals: {
         icon: :alert, tono: "rose", label: "Carta desactualizada",
         value: int(a.descuadrados.size), delta: "platos que no se cobran a su precio de carta",
-        hint: "El catálogo de Fudo dice un precio y se cobra otro. Donde más pasa es en el canal de aplicación." } do %>
+        hint: "El catálogo de Fudo dice un precio y se cobra otro. Mira siempre los últimos #{ProductPrices::VENTANA_CARTA} días, dé igual el período elegido: si tu carta está al día o no es una pregunta sobre hoy. Donde más pasa es en el canal de aplicación." } do %>
     <% if a.descuadrados.empty? %>
       <p class="muted">Todos los platos se cobran a su precio de carta.</p>
     <% else %>
@@ -157,7 +157,7 @@
         <thead><tr><th>Plato</th><th>Canal</th><th class="num">Carta</th><th class="num">Cobrado</th><th class="num">Desvío</th></tr></thead>
         <tbody>
           <% a.descuadrados.first(12).each do |g| %>
-            <% g.canales.select { |c| c.fiable? && c.desvio_pct && c.desvio_pct.abs >= 1 }.each do |c| %>
+            <% g.canales.select { |c| c.carta_fiable? && c.desvio_pct && c.desvio_pct.abs >= 1 }.each do |c| %>
               <tr>
                 <td><%= link_to g.name, product_path(c.product.fudo_product_id, period: a.period_key) %>
                     <%= fudo_edit_link(:product, c.product.fudo_product_id, titulo: "Corregir el precio de carta en Fudo") %></td>
