@@ -1,0 +1,72 @@
+<% a = @prices %>
+<section class="page-head">
+  <div>
+    <h1><%= @grupo&.name || @product.name %></h1>
+    <p class="muted">
+      <%= (@grupo&.vendidos || []).map { |c| "#{c.label} #{money(c.cobrado)}" }.join(" · ").presence || @product.name %>
+    </p>
+  </div>
+  <%= link_to "‹ Volver a productos", products_path(period: a.period_key), class: "btn btn--ghost" %>
+</section>
+
+<% if @grupo %>
+  <section class="card">
+    <h2>Por canal</h2>
+    <p class="muted small">Mismo plato, un producto de Fudo por canal. <%= a.comparison_note %></p>
+    <table class="table">
+      <thead><tr><th>Canal</th><th>Carta</th><th>Cobrado</th><th>Desvío</th><th>Antes</th>
+        <th>Ahora</th><th>Variación</th><th>Unidades</th><th>Impacto</th></tr></thead>
+      <tbody>
+        <% @grupo.canales.sort_by { |c| -c.unidades }.each do |c| %>
+          <tr>
+            <td><strong><%= c.label %></strong>
+                <%= content_tag(:span, "inactivo", class: "tag tag--warn",
+                      title: "Marcado como inactivo en Fudo, pero sigue vendiendo") unless c.product.active %></td>
+            <td class="muted"><%= money(c.carta) %></td>
+            <td><strong><%= money(c.cobrado) %></strong></td>
+            <td><%= c.desvio_pct && c.desvio_pct.abs >= 1 ? content_tag(:span, format("%+.0f%%", c.desvio_pct), class: "pct pct--down") : content_tag(:span, "—", class: "pct pct--na") %></td>
+            <td class="muted"><%= money(c.antes) %></td>
+            <td><%= money(c.ahora) %></td>
+            <td><%= c.comparable? ? pct_badge(100 + c.change_pct, 100) : content_tag(:span, "—", class: "pct pct--na") %></td>
+            <td><%= int(c.unidades) %></td>
+            <td class="<%= c.impacto.to_f.negative? ? 'txt--bad' : 'txt--good' %>"><%= money(c.impacto) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </section>
+<% end %>
+
+<% if @changes.any? %>
+  <section class="card">
+    <h2>Cambios de precio de carta</h2>
+    <p class="muted small">Lo que el catálogo de Fudo dijo cada día. Empieza el día que se guardó la primera foto.</p>
+    <table class="table">
+      <thead><tr><th>Fecha</th><th>Canal</th><th>Antes</th><th>Pasó a</th><th>Variación</th></tr></thead>
+      <tbody>
+        <% @changes.each do |c| %>
+          <% prod = Product.find_by(fudo_product_id: c.fudo_product_id) %>
+          <tr>
+            <td><%= c.changed_on.strftime("%d/%m/%Y") %></td>
+            <td class="muted"><%= prod&.channel_label %></td>
+            <td class="muted"><%= c.first_seen? ? "—" : money(c.was_price) %></td>
+            <td><%= money(c.price) %></td>
+            <td><%= c.change_pct ? pct_badge(100 + c.change_pct, 100) : content_tag(:span, "primera foto", class: "pct pct--na") %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </section>
+<% end %>
+
+<section class="card">
+  <h2>Qué se cobró, venta a venta</h2>
+  <p class="muted small"><%= int(@history.size) %> líneas. Cada punto es una línea de venta; los saltos hacia arriba son agregados.</p>
+  <div class="chart chart--tall">
+    <canvas data-controller="chart" data-chart-config-value="<%= {
+      type: "line",
+      labels: @history.map { |i| i.sold_on.strftime("%d/%m/%y") },
+      datasets: [{ label: "Precio cobrado", data: @history.map { |i| i.unit_price.to_f.round(2) } }]
+    }.to_json %>"></canvas>
+  </div>
+</section>

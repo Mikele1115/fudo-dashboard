@@ -1,0 +1,174 @@
+<% a = @prices %>
+
+<section class="page-head">
+  <div>
+    <h1>Productos</h1>
+    <p class="period">
+      <%= a.from.strftime("%d/%m/%Y") %><span class="period__sep">→</span><%= a.to.strftime("%d/%m/%Y") %>
+    </p>
+    <p class="muted small">Precios cobrados, con IVA · <%= a.comparison_note %></p>
+    <details class="note">
+      <summary>Cómo se mide</summary>
+      <ul>
+        <li>El mismo plato está en Fudo como varios productos, uno por canal
+            (PLATO, DELIVERY, APLICACION). Aquí sale <strong>una vez</strong>, con sus
+            canales al lado.</li>
+        <li><strong>Carta</strong> es el precio del catálogo de Fudo.
+            <strong>Cobrado</strong> es la mediana de lo que se facturó de verdad. Cuando
+            no coinciden, manda el cobrado: es lo que pasó.</li>
+        <li>Mediana y no promedio: el precio de una línea sube con los agregados, y un
+            promedio se iría detrás de la pizza que lleve más extras.</li>
+        <li>Las líneas a precio 0 (promociones y combos) quedan fuera, y las variaciones
+            con menos de <%= ProductPrices::MIN_CONFIDENCE %> ventas en algún extremo no
+            se muestran.</li>
+      </ul>
+    </details>
+  </div>
+  <div class="datepicker">
+    <form method="get" action="<%= products_path %>" class="inline">
+      <%= hidden_field_tag :sort, @sort %>
+      <select name="period" onchange="this.form.requestSubmit()">
+        <% ProductPrices::PERIODS.each do |key, label| %>
+          <option value="<%= key %>" <%= "selected" if key == a.period_key %>><%= label %></option>
+        <% end %>
+      </select>
+    </form>
+    <%= button_to sync_products_path, params: { period: a.period_key },
+                  class: "btn btn--light", form_class: "inline" do %>
+      <%= icon(:refresh, size: 16) %> Actualizar productos
+    <% end %>
+  </div>
+</section>
+
+<%# El buscador va arriba, igual que en Insumos: casi siempre se busca un plato. %>
+<% busqueda = sin_acentos(@query) %>
+<% coincidentes = @query.present? ? @grupos.select { |g| sin_acentos(g.name).include?(busqueda) } : [] %>
+<% visibles = @query.present? ? coincidentes : (@show_all ? @grupos : []) %>
+<section class="card" data-controller="filtro"
+         data-filtro-total-value="<%= @grupos.size %>"
+         data-filtro-show-all-when-empty-value="<%= @show_all %>">
+  <div class="card--actions">
+    <h2>Buscar un plato</h2>
+    <form method="get" action="<%= products_path %>" class="toolbar" data-action="submit->filtro#prevent">
+      <%= hidden_field_tag :period, a.period_key %>
+      <%= hidden_field_tag :all, "1" if @show_all %>
+      <input type="search" name="q" value="<%= @query %>" placeholder="Buscar plato…"
+             autocomplete="off" aria-label="Buscar plato"
+             data-filtro-target="input" data-action="input->filtro#filter search->filtro#filter">
+      <select name="sort" onchange="this.form.submit()">
+        <option value="ingreso"  <%= "selected" if @sort == "ingreso" %>>Lo que más factura</option>
+        <option value="alza"     <%= "selected" if @sort == "alza" %>>Mayor subida</option>
+        <option value="baja"     <%= "selected" if @sort == "baja" %>>Mayor bajada</option>
+        <option value="impacto"  <%= "selected" if @sort == "impacto" %>>Impacto en pesos</option>
+        <option value="unidades" <%= "selected" if @sort == "unidades" %>>Más vendidos</option>
+        <option value="nombre"   <%= "selected" if @sort == "nombre" %>>Nombre</option>
+      </select>
+      <noscript><button class="btn btn--light">Buscar</button></noscript>
+    </form>
+  </div>
+
+  <p class="muted small" data-filtro-target="prompt" <%= "hidden" if visibles.any? || @query.present? %>>
+    Escribe el nombre de un plato.
+    <%= link_to "Ver los #{int(@grupos.size)}", products_path(period: a.period_key, sort: @sort, all: 1) %>
+  </p>
+  <p class="muted" data-filtro-target="empty" <%= "hidden" unless @query.present? && coincidentes.empty? %>>
+    Ningún plato coincide con «<span data-filtro-target="query"><%= @query %></span>».
+    <%= link_to "Ver todos", products_path(period: a.period_key, sort: @sort, all: 1) %>
+  </p>
+  <p class="muted small" data-filtro-target="status" aria-live="polite" <%= "hidden" if visibles.empty? %>>
+    <%= int(visibles.size) %> de <%= int(@grupos.size) %> platos. Haz clic en uno para ver su detalle.
+  </p>
+
+  <table class="table table--rows" data-filtro-target="table" <%= "hidden" if visibles.empty? %>>
+    <thead>
+      <tr><th>Plato</th><th>Canales</th><th>Cobrado</th><th>Antes</th><th>Variación</th>
+          <th>Unidades</th><th>Facturado</th><th>Impacto</th></tr>
+    </thead>
+    <tbody>
+      <% @grupos.each do |g| %>
+        <% principal = g.vendidos.max_by(&:unidades) %>
+        <tr data-filtro-target="row" data-nombre="<%= sin_acentos(g.name) %>"
+            <%= "hidden" unless visibles.include?(g) %>>
+          <td><%= link_to g.name, product_path(principal.product.fudo_product_id, period: a.period_key) %></td>
+          <td class="muted small"><%= g.vendidos.map(&:label).join(" · ") %></td>
+          <td><strong><%= money(principal.cobrado) %></strong>
+              <%= content_tag(:span, "≠ carta", class: "tag tag--warn",
+                              title: "Carta #{money(principal.carta)}") unless g.cuadra? %></td>
+          <td class="muted"><%= money(principal.antes) %></td>
+          <td><%= g.change_pct ? pct_badge(100 + g.change_pct, 100) : content_tag(:span, "—", class: "pct pct--na") %></td>
+          <td><%= int(g.unidades) %></td>
+          <td><%= money(g.ingreso) %></td>
+          <td class="<%= g.impacto.negative? ? 'txt--good' : 'txt--bad' %>"><%= money(g.impacto) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</section>
+
+<section class="kpis kpis--5">
+  <%= render layout: "shared/kpi", locals: {
+        icon: :money, tono: "blue", label: "Facturado",
+        value: money(a.con_ventas.sum(&:ingreso)),
+        delta: "#{a.period_label.downcase}, con IVA",
+        hint: "Suma de lo cobrado por cada plato en el período, al precio al que se cobró." } do %>
+    <%= render "products/familias", prices: a %>
+  <% end %>
+
+  <%= render layout: "shared/kpi", locals: {
+        icon: :basket, tono: "violet", label: "El menú",
+        value: a.menu_change_pct ? pct_text(a.menu_change_pct + 100, 100) : "—",
+        value_class: a.menu_change_pct.nil? ? "" : (a.menu_change_pct.positive? ? "txt--good" : "txt--bad"),
+        delta: "ponderado por lo que factura cada plato",
+        hint: "Cuánto se movieron tus precios de venta. Que suba es bueno aquí: es lo que cobras, no lo que pagas." } do %>
+    <%= render "products/movidos", grupos: a.con_ventas %>
+  <% end %>
+
+  <% imp = a.con_ventas.sum(&:impacto) %>
+  <%= render layout: "shared/kpi", locals: {
+        icon: :up, tono: imp.negative? ? "rose" : "green",
+        label: imp.negative? ? "Dejaste de cobrar" : "Cobraste de más",
+        value: money(imp.abs), value_class: imp.negative? ? "txt--bad" : "txt--good",
+        delta: "vendiendo lo mismo al precio de ahora",
+        hint: "Unidades vendidas x (precio de ahora − precio del arranque), plato a plato." } do %>
+    <%= render "products/movidos", grupos: a.con_ventas, por: :impacto %>
+  <% end %>
+
+  <%= render layout: "shared/kpi", locals: {
+        icon: :chart, tono: "amber", label: "Subieron",
+        value: int(a.subieron.size), delta: "#{int(a.bajaron.size)} bajaron",
+        hint: "Un plato cuenta como movido cuando pasa de ±#{ProductPrices::STABLE_PCT.round}%." } do %>
+    <div class="grid-2">
+      <div><h3 class="kpi__subtitle txt--good">Subieron (<%= int(a.subieron.size) %>)</h3>
+        <%= render "products/movidos", grupos: a.subieron %></div>
+      <div><h3 class="kpi__subtitle txt--bad">Bajaron (<%= int(a.bajaron.size) %>)</h3>
+        <%= render "products/movidos", grupos: a.bajaron %></div>
+    </div>
+  <% end %>
+
+  <%= render layout: "shared/kpi", locals: {
+        icon: :alert, tono: "rose", label: "Carta desactualizada",
+        value: int(a.descuadrados.size), delta: "platos que no se cobran a su precio de carta",
+        hint: "El catálogo de Fudo dice un precio y se cobra otro. Donde más pasa es en el canal de aplicación." } do %>
+    <% if a.descuadrados.empty? %>
+      <p class="muted">Todos los platos se cobran a su precio de carta.</p>
+    <% else %>
+      <table class="table table--compact">
+        <thead><tr><th>Plato</th><th>Canal</th><th class="num">Carta</th><th class="num">Cobrado</th><th class="num">Desvío</th></tr></thead>
+        <tbody>
+          <% a.descuadrados.first(12).each do |g| %>
+            <% g.canales.select { |c| c.fiable? && c.desvio_pct && c.desvio_pct.abs >= 1 }.each do |c| %>
+              <tr>
+                <td><%= link_to g.name, product_path(c.product.fudo_product_id, period: a.period_key) %></td>
+                <td class="muted"><%= c.label %></td>
+                <td class="num muted"><%= money(c.carta) %></td>
+                <td class="num"><%= money(c.cobrado) %></td>
+                <td class="num <%= c.desvio_pct.positive? ? 'txt--good' : 'txt--bad' %>">
+                  <%= format("%+.0f%%", c.desvio_pct) %></td>
+              </tr>
+            <% end %>
+          <% end %>
+        </tbody>
+      </table>
+    <% end %>
+  <% end %>
+</section>

@@ -35,6 +35,9 @@
             <%= link_to ingredients_path, class: ["nav__link", ("nav__link--active" if %w[ingredients ingredient_categories].include?(controller_name))] do %>
               <%= icon(:box) %><span>Insumos</span>
             <% end %>
+            <%= link_to products_path, class: ["nav__link", ("nav__link--active" if controller_name == "products")] do %>
+              <%= icon(:basket) %><span>Productos</span>
+            <% end %>
           </nav>
 
           <div class="sidebar__foot">

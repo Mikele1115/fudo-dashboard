@@ -1,0 +1,27 @@
+<%# Lista corta de platos ordenada por variación o por impacto en pesos. %>
+<% orden = local_assigns.fetch(:por, :variacion) %>
+<% filas = grupos.select(&:change_pct) %>
+<% filas = orden == :impacto ? filas.sort_by { |g| -g.impacto.abs } : filas.sort_by { |g| -g.change_pct.abs } %>
+<% if filas.empty? %>
+  <p class="muted small">Ninguno con variación fiable en el período.</p>
+<% else %>
+  <table class="table table--compact">
+    <thead><tr><th>Plato</th><th class="num">Antes</th><th class="num">Ahora</th>
+      <th class="num">Variación</th><th class="num">Impacto</th></tr></thead>
+    <tbody>
+      <% filas.first(12).each do |g| %>
+        <% c = g.canales.select(&:comparable?).max_by(&:unidades) %>
+        <tr>
+          <td><%= link_to g.name, product_path(c.product.fudo_product_id) %></td>
+          <td class="num muted"><%= money(c.antes) %></td>
+          <td class="num"><%= money(c.ahora) %></td>
+          <td class="num"><%= pct_badge(100 + g.change_pct, 100) %></td>
+          <td class="num <%= g.impacto.negative? ? 'txt--bad' : 'txt--good' %>"><%= money(g.impacto) %></td>
+        </tr>
+      <% end %>
+      <% if filas.size > 12 %>
+        <tr><td colspan="5" class="muted small">y <%= filas.size - 12 %> más</td></tr>
+      <% end %>
+    </tbody>
+  </table>
+<% end %>

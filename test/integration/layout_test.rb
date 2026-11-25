@@ -22,7 +22,7 @@ class LayoutTest < ActionDispatch::IntegrationTest
     rutas = {
       "dashboard"  => root_path,
       "historial"  => history_path,
-      "insumos"    => ingredients_path,
+      "insumos" => ingredients_path, "productos" => products_path,
       "insumo"     => ingredient_path(1),
       "revisar"    => review_ingredients_path,
       "categorías" => ingredient_categories_path,

@@ -33,18 +33,13 @@ class IngredientPrices
   # Ahora la ventana es un tercio del período —así siempre caben las dos, con
   # un hueco en medio— con un techo de 90 días para que en períodos largos no
   # se comparen trozos enormes, y un suelo de 21 para que no se compare ruido.
-  MAX_WINDOW_DAYS = 90
-  MIN_WINDOW_DAYS = 21
-
-  # Debajo de este largo, partir el período en dos no funciona: un tercio queda por
-  # debajo de MIN_WINDOW_DAYS, el suelo levanta la ventana y las dos mitades se pisan.
-  # En "1 mes" (30 días) las ventanas de 21 se solaparían 12 días, o sea que una misma
-  # compra sería a la vez el "antes" y el "después".
-  #
-  # Para esos períodos la comparación se hace CONTRA EL PERÍODO ANTERIOR del mismo
-  # largo: el mes elegido contra el mes de antes. Además de ser lo que uno espera al
-  # pedir "1 mes", pone un mes entero a cada lado en vez de dos trozos de 10 días.
-  SPLIT_MIN_DAYS = MIN_WINDOW_DAYS * 3
+  # La regla entera —ventana de un tercio, techo, suelo y el modo :previous para
+  # períodos cortos— vive en ComparisonWindow, porque la comparten este análisis y el
+  # de precios de venta. Aquí quedan los nombres de siempre para no romper a quien los
+  # use desde fuera.
+  MAX_WINDOW_DAYS = ComparisonWindow::MAX_WINDOW_DAYS
+  MIN_WINDOW_DAYS = ComparisonWindow::MIN_WINDOW_DAYS
+  SPLIT_MIN_DAYS  = ComparisonWindow::SPLIT_MIN_DAYS
 
   # Historial mínimo sobre el que se calcula el "precio normal" de un insumo, la
   # mediana que decide qué compras son dudosas.
@@ -346,37 +341,12 @@ class IngredientPrices
 
   def period_label = PERIODS[@period_key]
 
-  # :split    -> se comparan los primeros window_days del período con los últimos
-  # :previous -> se compara el período entero con el período anterior del mismo largo
-  def compare_mode = (@to - @from).to_i + 1 >= SPLIT_MIN_DAYS ? :split : :previous
+  # La ventana de comparación es común con el análisis de precios de venta.
+  def ventana = @ventana ||= ComparisonWindow.new(@from, @to)
 
-  def split? = compare_mode == :split
-
-  # Un tercio del período, entre 21 y 90 días. Solo se usa en modo :split.
-  def window_days
-    @window_days ||= begin
-      tercio = ((@to - @from).to_i / 3.0).floor
-      tercio.clamp(MIN_WINDOW_DAYS, MAX_WINDOW_DAYS)
-    end
-  end
-
-  # Primer día del período anterior, el que hace de referencia en modo :previous.
-  def previous_from = @from - ((@to - @from).to_i + 1)
-
-  # Cómo se calculan las variaciones, para decirlo en pantalla.
-  #
-  # Ojo con la redacción del caso :split. Decía "primeros N días contra los últimos N",
-  # que suena a que se cuentan desde el primer día del período, y no es así: se cuentan
-  # desde la primera compra de CADA insumo. Los camarones arrancan el 20/11 porque ese
-  # día se compraron por primera vez, no el 15/11 que empieza el período.
-  def comparison_note
-    if split?
-      "variaciones: #{window_days} días al principio contra #{window_days} al final"
-    else
-      "variaciones: contra los #{(@to - @from).to_i + 1} días anteriores " \
-        "(#{previous_from.strftime('%d/%m/%Y')} → #{(@from - 1).strftime('%d/%m/%Y')})"
-    end
-  end
+  delegate :split?, :window_days, :previous_from, to: :ventana
+  def compare_mode    = ventana.mode
+  def comparison_note = ventana.note
 
   private
 

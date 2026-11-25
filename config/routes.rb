@@ -4,6 +4,9 @@ Rails.application.routes.draw do
   root "dashboard#show"
 
   get  "historial", to: "history#index", as: :history
+  get  "productos", to: "products#index", as: :products
+  get  "productos/:id", to: "products#show", as: :product, constraints: { id: /[0-9]+/ }
+  post "productos/actualizar", to: "products#sync", as: :sync_products
   get  "insumos", to: "ingredients#index", as: :ingredients
   get   "insumos/categorias", to: "ingredient_categories#index", as: :ingredient_categories
   patch "insumos/categorias", to: "ingredient_categories#update"

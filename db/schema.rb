@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_13_133440) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_25_143051) do
   create_table "daily_sales", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.date "date", null: false
@@ -102,6 +102,36 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_133440) do
     t.index ["purchased_on"], name: "index_price_alerts_on_purchased_on"
   end
 
+  create_table "product_price_changes", force: :cascade do |t|
+    t.date "changed_on", null: false
+    t.datetime "created_at", null: false
+    t.integer "fudo_product_id", null: false
+    t.decimal "price", precision: 14, scale: 2, null: false
+    t.datetime "updated_at", null: false
+    t.decimal "was_price", precision: 14, scale: 2
+    t.index ["changed_on"], name: "index_product_price_changes_on_changed_on"
+    t.index ["fudo_product_id", "changed_on"], name: "index_product_price_changes_on_fudo_product_id_and_changed_on", unique: true
+  end
+
+  create_table "products", force: :cascade do |t|
+    t.boolean "active", default: true, null: false
+    t.string "base_name"
+    t.string "category_name"
+    t.string "channel"
+    t.string "code"
+    t.decimal "cost", precision: 14, scale: 2
+    t.datetime "created_at", null: false
+    t.integer "fudo_category_id"
+    t.integer "fudo_product_id", null: false
+    t.string "name", null: false
+    t.decimal "price", precision: 14, scale: 2
+    t.datetime "synced_at"
+    t.datetime "updated_at", null: false
+    t.index ["base_name"], name: "index_products_on_base_name"
+    t.index ["fudo_product_id"], name: "index_products_on_fudo_product_id", unique: true
+    t.index ["name"], name: "index_products_on_name"
+  end
+
   create_table "report_deliveries", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.text "message"
@@ -111,6 +141,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_13_133440) do
     t.string "status", default: "sending", null: false
     t.datetime "updated_at", null: false
     t.index ["report_date"], name: "index_report_deliveries_on_report_date"
+  end
+
+  create_table "sale_items", force: :cascade do |t|
+    t.datetime "closed_at", null: false
+    t.datetime "created_at", null: false
+    t.integer "fudo_item_id", null: false
+    t.integer "fudo_product_id", null: false
+    t.integer "fudo_sale_id", null: false
+    t.decimal "line_total", precision: 14, scale: 2, null: false
+    t.string "product_name", null: false
+    t.decimal "quantity", precision: 14, scale: 4, null: false
+    t.date "sold_on", null: false
+    t.decimal "unit_price", precision: 14, scale: 4, null: false
+    t.datetime "updated_at", null: false
+    t.index ["fudo_item_id"], name: "index_sale_items_on_fudo_item_id", unique: true
+    t.index ["fudo_product_id", "sold_on"], name: "index_sale_items_on_fudo_product_id_and_sold_on"
+    t.index ["sold_on"], name: "index_sale_items_on_sold_on"
   end
 
   create_table "sessions", force: :cascade do |t|

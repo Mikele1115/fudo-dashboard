@@ -189,6 +189,116 @@ module Fudo
       found
     end
 
+    # Catálogo de productos con su precio de carta de HOY.
+    #
+    # Es una foto, no un historial: /products no guarda precios anteriores y ni siquiera
+    # trae `updatedAt`, así que desde aquí no hay forma de saber cuándo cambió un precio.
+    # Por eso el seguimiento del precio de carta se construye guardando esta foto cada
+    # noche; el histórico hacia atrás sale de las líneas de venta (ver sale_items).
+    #
+    # Devuelve: { id:, name:, price:, cost:, active:, code:, category_id:, category_name: }
+    def products
+      found = []
+      page  = 1
+      loop do
+        # Sin fields[product]: la API no acepta productCategory ahí (devuelve 400 con la
+        # lista de campos válidos). Los atributos de un producto son pocos, así que se
+        # piden todos y se usa lo que hace falta.
+        body = get("/products",
+                   "include"      => "productCategory",
+                   "sort"         => "id",
+                   "page[size]"   => PAGE_SIZE,
+                   "page[number]" => page)
+        included = body.fetch("included", []).each_with_object({}) { |r, h| h[[r["type"], r["id"]]] = r }
+
+        rows = body.fetch("data", [])
+        rows.each do |row|
+          attrs   = row["attributes"] || {}
+          cat_ref = row.dig("relationships", "productCategory", "data")
+          found << {
+            id:            row["id"].to_i,
+            name:          attrs["name"].to_s,
+            price:         attrs["price"]&.to_f,
+            cost:          attrs["cost"]&.to_f,
+            active:        attrs["active"] ? true : false,
+            code:          attrs["code"].presence,
+            category_id:   cat_ref && cat_ref["id"].to_i,
+            category_name: cat_ref && included[[cat_ref["type"], cat_ref["id"]]]&.dig("attributes", "name")
+          }
+        end
+        break if rows.size < PAGE_SIZE
+
+        page += 1
+      end
+      found
+    end
+
+    # Líneas de venta entre dos instantes: qué producto, cuántas unidades y a cuánto.
+    #
+    # /items existe pero NO acepta filtro por fecha (devuelve 400), así que las líneas se
+    # piden colgando de las ventas, que sí se filtran por closedAt. Es la misma vía por la
+    # que ya vienen las propinas.
+    #
+    # Ojo, comprobado contra la cuenta real:
+    #   - `price` de la línea es el TOTAL de la línea, no el unitario: una Coca Cola
+    #     aparece a 2.900 y a 5.800 el mismo día, que son una y dos unidades.
+    #   - el unitario de un mismo producto varía de verdad dentro del día por los
+    #     agregados: la Margherita 32 salió a seis precios distintos el 20/11.
+    #   - hay líneas a 0 (promociones o componentes de combo) y líneas anuladas.
+    #
+    # Devuelve: { item_id:, sale_id:, product_id:, product_name:, closed_at: Time (UTC),
+    #             quantity: Float, line_total: Float }
+    def sale_items(from_utc, to_utc)
+      items = []
+      page  = 1
+      loop do
+        body = get("/sales",
+                   "filter[closedAt]"  => "and(gte.#{iso(from_utc)},lt.#{iso(to_utc)})",
+                   "filter[saleState]" => "in.(CLOSED)",
+                   # Sin fields[...]: la API rechaza fields[item] (400). Se pide entero.
+                   "include"           => "items,items.product",
+                   "sort"              => "closedAt",
+                   "page[size]"        => PAGE_SIZE,
+                   "page[number]"      => page)
+        included = body.fetch("included", []).each_with_object({}) { |r, h| h[[r["type"], r["id"]]] = r }
+
+        rows = body.fetch("data", [])
+        rows.each do |sale|
+          closed = sale.dig("attributes", "closedAt")
+          next if closed.nil?
+
+          closed_at = Time.iso8601(closed).utc
+          (sale.dig("relationships", "items", "data") || []).each do |ref|
+            item = included[[ref["type"], ref["id"]]]
+            next if item.nil?
+
+            attrs = item["attributes"] || {}
+            next if attrs["canceled"]
+
+            quantity = attrs["quantity"].to_f
+            next unless quantity.positive? # sin cantidad no hay unitario que calcular
+
+            prod_ref = item.dig("relationships", "product", "data")
+            next if prod_ref.nil? # línea sin producto (ajuste suelto)
+
+            items << {
+              item_id:      item["id"].to_i,
+              sale_id:      sale["id"].to_i,
+              product_id:   prod_ref["id"].to_i,
+              product_name: included[[prod_ref["type"], prod_ref["id"]]]&.dig("attributes", "name").to_s,
+              closed_at:    closed_at,
+              quantity:     quantity,
+              line_total:   attrs["price"].to_f
+            }
+          end
+        end
+        break if rows.size < PAGE_SIZE
+
+        page += 1
+      end
+      items
+    end
+
     # Prueba de conexión: autentica y pide 1 venta.
     def ping
       token

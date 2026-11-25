@@ -1,0 +1,22 @@
+<%# Dónde se factura, por categoría de Fudo. %>
+<% por_cat = prices.con_ventas.group_by { |g| g.vendidos.first&.product&.category_name.presence || "Sin categoría" } %>
+<% total = prices.con_ventas.sum(&:ingreso) %>
+<table class="table table--compact">
+  <thead><tr><th>Categoría</th><th class="num">Platos</th><th class="num">Unidades</th>
+    <th class="num">Facturado</th><th class="num">Del total</th></tr></thead>
+  <tbody>
+    <% por_cat.sort_by { |_, gs| -gs.sum(&:ingreso) }.each do |nombre, gs| %>
+      <% ingreso = gs.sum(&:ingreso) %>
+      <tr>
+        <td><%= nombre %></td>
+        <td class="num muted"><%= int(gs.size) %></td>
+        <td class="num muted"><%= int(gs.sum(&:unidades)) %></td>
+        <td class="num"><%= money(ingreso) %></td>
+        <td class="num muted"><%= total.positive? ? "#{(ingreso / total * 100).round(1)}%".tr(".", ",") : "—" %></td>
+      </tr>
+    <% end %>
+  </tbody>
+  <tfoot><tr><th>Total</th><th class="num"><%= int(prices.con_ventas.size) %></th>
+    <th class="num"><%= int(prices.con_ventas.sum(&:unidades)) %></th>
+    <th class="num"><%= money(total) %></th><th class="num">100%</th></tr></tfoot>
+</table>
