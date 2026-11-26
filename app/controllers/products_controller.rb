@@ -24,17 +24,6 @@ class ProductsController < ApplicationController
     @changes = ProductPriceChange.where(fudo_product_id: ids_del_grupo).recent.limit(20)
   end
 
-  # Botón "Actualizar productos": catálogo y líneas de venta.
-  def sync
-    catalogo = ProductsSync.run!
-    lineas   = SaleItemsSync.catch_up!
-    redirect_to products_path(period: params[:period]),
-                notice: "#{catalogo.message}. #{lineas.message}."
-  rescue StandardError => e
-    redirect_to products_path(period: params[:period]),
-                alert: "No se pudieron actualizar los productos: #{e.message}"
-  end
-
   private
 
   def ids_del_grupo = @grupo ? @grupo.canales.map { |c| c.product.fudo_product_id } : [@product.fudo_product_id]

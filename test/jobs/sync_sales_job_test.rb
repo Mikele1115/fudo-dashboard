@@ -39,11 +39,25 @@ class SyncSalesJobTest < ActiveJob::TestCase
     @originales.each { |(klass, metodo), original| klass.define_singleton_method(metodo, original) }
   end
 
-  test "el botón del dashboard solo baja las ventas del día" do
+  test "el botón del panel baja las ventas y los precios de venta" do
+    # Sustituye al botón "Actualizar productos" que había en la pantalla de Productos.
+    SyncSalesJob.perform_now("2026-11-04", with_products: true)
+
+    assert_equal ["SalesSync.run!", "ProductsSync.run!", "SaleItemsSync.catch_up!"], Espia.llamadas
+  end
+
+  test "el botón del panel NO manda correos" do
+    # Las alertas de precios van a varias personas: no pueden salir cada vez que
+    # alguien pulsa un botón. Se detectan igual y el aviso sale por la noche.
+    SyncSalesJob.perform_now("2026-11-04", with_products: true)
+
+    assert_not_includes Espia.llamadas, "AlertNotifier.call"
+  end
+
+  test "sin pedir nada sigue siendo solo las ventas del día" do
     SyncSalesJob.perform_now("2026-11-04")
 
-    assert_equal ["SalesSync.run!"], Espia.llamadas,
-                 "el botón tiene que responder rápido: nada de catálogos ni compras"
+    assert_equal ["SalesSync.run!"], Espia.llamadas
   end
 
   test "la corrida nocturna hace los ocho pasos, y los de venta al final" do
@@ -59,6 +73,13 @@ class SyncSalesJobTest < ActiveJob::TestCase
       "ProductsSync.run!",
       "SaleItemsSync.catch_up!"
     ], Espia.llamadas
+  end
+
+  test "la corrida nocturna sí avisa por correo" do
+    SyncSalesJob.perform_now("2026-11-04", with_purchases: true)
+
+    assert_includes Espia.llamadas, "AlertNotifier.call",
+                    "quitar el correo de la noche dejaría las alertas sin salir nunca"
   end
 
   test "los precios de venta van después de las alertas" do
