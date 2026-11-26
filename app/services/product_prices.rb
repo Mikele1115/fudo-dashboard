@@ -112,11 +112,12 @@ class ProductPrices
 
   attr_reader :from, :to, :period_key
 
-  def initialize(period: "3", from: nil, to: nil)
+  def initialize(period: "3", from: nil, to: nil, descatalogados: false)
     @period_key = PERIODS.key?(period.to_s) ? period.to_s : "3"
     @to      = to   || SaleItem.last_sold_on || AppSettings.today
     @from    = from || default_from
     @ventana = ComparisonWindow.new(@from, @to)
+    @descatalogados = descatalogados
   end
 
   delegate :split?, :window_days, :previous_from, to: :@ventana
@@ -164,17 +165,39 @@ class ProductPrices
     @to.prev_month(@period_key.to_i) + 1
   end
 
-  # Qué productos entran: los activos con precio MÁS cualquiera que haya vendido en el
-  # período, esté activo o no.
+  # Qué productos entran: los activos con precio MÁS los inactivos que SIGUEN VENDIENDO.
   #
-  # Lo segundo no es un extra: en el catálogo hay 24 productos marcados como inactivos
-  # que siguen vendiendo, y entre ellos está el más vendido de todos —la Margherita 32
-  # APLICACION, 419 unidades en tres meses—. Filtrando solo por `active` desaparecía del
-  # informe el producto que más factura.
+  # El `active` de Fudo no dice lo que parece. De 356 canales con ventas en 12 meses, 92
+  # son de productos marcados como inactivos, y 19 de ellos siguen vendiendo: entre esos
+  # está el más vendido de todos, la Margherita 32 APLICACION, con 531 unidades en los
+  # últimos 30 días y $17M al año. Filtrar por `active` a secas borraría del informe el
+  # producto que más factura.
+  #
+  # Los otros 73 son catálogo muerto —"Margherita Pedidos Ya", "Coda APA 500cc"— que solo
+  # estorba. Esos sí quedan fuera, y el panel dice cuántos son y deja verlos a un clic.
   def universo(ids_con_venta)
-    Product.where(id: Product.activos.con_precio)
-           .or(Product.where(fudo_product_id: ids_con_venta)).to_a
+    vivos = Product.activos.con_precio
+    return Product.where(id: vivos).or(Product.where(fudo_product_id: ids_con_venta)).to_a if @descatalogados
+
+    Product.where(id: vivos)
+           .or(Product.where(fudo_product_id: ventas_recientes.keys)).to_a
   end
+
+  public
+
+  # Inactivos en Fudo que vendieron en el período pero ya no venden: fuera del informe
+  # salvo que se pidan expresamente. Se cuentan para poder decirlo en pantalla.
+  def descatalogados
+    @descatalogados_lista ||= begin
+      vivos = Product.activos.con_precio.pluck(:fudo_product_id).to_set
+      ids   = ventas_por_producto.keys - ventas_recientes.keys.to_a
+      Product.where(fudo_product_id: ids).reject { |p| vivos.include?(p.fudo_product_id) }
+    end
+  end
+
+  def descatalogados? = @descatalogados
+
+  private
 
   def canal_de(producto, ventas, previas)
     precios = ventas.map { |(_, p)| p.to_f }

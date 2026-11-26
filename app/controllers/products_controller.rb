@@ -3,7 +3,8 @@
 # Precios de venta: qué cobras por cada plato, por canal, y cómo se ha movido.
 class ProductsController < ApplicationController
   def index
-    @prices = ProductPrices.new(period: params[:period])
+    # ?descatalogados=1 vuelve a incluir los inactivos que ya no venden.
+    @prices = ProductPrices.new(period: params[:period], descatalogados: params[:descatalogados].present?)
     @query  = params[:q].to_s.strip
     @sort   = params[:sort].presence || "ingreso"
     @show_all = params[:all].present?
@@ -11,7 +12,9 @@ class ProductsController < ApplicationController
   end
 
   def show
-    @prices  = ProductPrices.new(period: params[:period])
+    # En el detalle entran todos: si llegas a un plato descatalogado por un enlace,
+    # tiene que poder enseñarse.
+    @prices  = ProductPrices.new(period: params[:period], descatalogados: true)
     @product = Product.find_by(fudo_product_id: params[:id].to_i)
     return redirect_to products_path, alert: "Ese producto no existe." if @product.nil?
 

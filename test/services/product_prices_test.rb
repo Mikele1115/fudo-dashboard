@@ -41,6 +41,31 @@ class ProductPricesTest < ActiveSupport::TestCase
     assert_equal 30, g.unidades
   end
 
+  test "un inactivo que ya no vende sale del informe, y se puede volver a ver" do
+    producto(1, "Vigente PLATO", 10_000)
+    6.times { |i| vender(1, "Vigente PLATO", 10_000, on: HOY - i) }
+    producto(2, "Descatalogado PLATO", 9_000, activo: false)
+    6.times { |i| vender(2, "Descatalogado PLATO", 9_000, on: HOY - 200 + i) }
+
+    sin = ProductPrices.new(period: "12", to: HOY)
+    assert_equal ["Vigente"], sin.con_ventas.map(&:name)
+    assert_equal ["Descatalogado PLATO"], sin.descatalogados.map(&:name)
+
+    con = ProductPrices.new(period: "12", to: HOY, descatalogados: true)
+    assert_includes con.con_ventas.map(&:name), "Descatalogado"
+  end
+
+  test "un inactivo que SÍ vende se queda, pase lo que pase" do
+    producto(1, "Margherita 32 cm APLICACION", 11_600, activo: false)
+    8.times { |i| vender(1, "Margherita 32 cm APLICACION", 14_250, on: HOY - i) }
+
+    a = ProductPrices.new(period: "12", to: HOY)
+
+    assert_equal ["Margherita 32 cm"], a.con_ventas.map(&:name),
+                 "es el más vendido: sacarlo por estar inactivo en Fudo sería el peor error"
+    assert_empty a.descatalogados
+  end
+
   test "un producto inactivo que sigue vendiendo no desaparece del informe" do
     cargar_margherita
 

@@ -6,7 +6,17 @@
     <p class="period">
       <%= a.from.strftime("%d/%m/%Y") %><span class="period__sep">→</span><%= a.to.strftime("%d/%m/%Y") %>
     </p>
-    <p class="muted small">Precios cobrados, con IVA · <%= a.comparison_note %></p>
+<p class="muted small">
+  Precios cobrados, con IVA · <%= a.comparison_note %>
+  <% if a.descatalogados? %>
+    · incluyendo los descatalogados.
+    <%= link_to "Ocultarlos", products_path(period: a.period_key, sort: @sort) %>
+  <% elsif a.descatalogados.any? %>
+    · fuera <%= int(a.descatalogados.size) %> descatalogados (inactivos en Fudo y sin ventas
+    en los últimos <%= ProductPrices::VENTANA_CARTA %> días).
+    <%= link_to "Verlos", products_path(period: a.period_key, sort: @sort, descatalogados: 1) %>
+  <% end %>
+</p>
     <details class="note">
       <summary>Cómo se mide</summary>
       <ul>
@@ -90,7 +100,10 @@
         <tr data-filtro-target="row" data-nombre="<%= sin_acentos(g.name) %>"
             <%= "hidden" unless visibles.include?(g) %>>
           <td><%= link_to g.name, product_path(principal.product.fudo_product_id, period: a.period_key) %>
-              <%= fudo_edit_link(:product, principal.product.fudo_product_id) %></td>
+              <%= fudo_edit_link(:product, principal.product.fudo_product_id) %>
+              <% if g.vendidos.any? { |c| !c.product.active } %>
+                <span class="tag tag--warn" title="Marcado como inactivo en Fudo, pero sigue vendiendo">inactivo en Fudo</span>
+              <% end %></td>
           <td class="muted small"><%= g.vendidos.map(&:label).join(" · ") %></td>
           <td><strong><%= money(principal.cobrado) %></strong>
               <%= content_tag(:span, "≠ carta", class: "tag tag--warn",
