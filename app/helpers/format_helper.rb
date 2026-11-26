@@ -69,7 +69,7 @@ module FormatHelper
                                  title: "El costo cargado (#{money(canal.costo)}) es mayor que lo que se cobra sin IVA (#{money(canal.precio_neto)}). Hay que revisarlo en Fudo.")], " ")
     end
 
-    safe_join([money(canal.costo), tag.span("sin IVA", class: "muted small")], " ")
+    safe_join([money(canal.costo), origen_costo(canal.product)], " ")
   end
 
   # El margen sobre el precio sin IVA. Rojo cuando sale negativo: ahí el costo está mal
@@ -98,6 +98,21 @@ module FormatHelper
     return "—" if razon.nil?
 
     format("%.1f×", razon).tr(".", ",")
+  end
+
+  # De dónde sale el costo. Una receta se recalcula sola cuando sube un insumo; un
+  # número tecleado se queda con el valor del día que alguien lo escribió, y conviene
+  # saber cuál de los dos estás mirando.
+  ORIGEN_COSTO = {
+    receta:   ["receta", "Lo calcula Fudo sumando la ficha técnica del producto. Neto, sin IVA."],
+    tecleado: ["a mano", "Tecleado en Fudo, en Costo → Editar. No se actualiza solo. Neto, sin IVA."]
+  }.freeze
+
+  def origen_costo(producto)
+    etiqueta, explicacion = ORIGEN_COSTO[producto.cost_source]
+    return "" if etiqueta.nil?
+
+    tag.span(etiqueta, class: "muted small", title: explicacion)
   end
 
   # Cuándo se vendió por última vez. Dice si el costo roto le pega a algo que vendes

@@ -15,6 +15,8 @@ class Product < ApplicationRecord
   scope :activos,    -> { where(active: true) }
   scope :alfabetico, -> { order(:base_name, :channel) }
   scope :con_precio, -> { where.not(price: nil).where.not(price: 0) }
+  # Con costo por cualquiera de las dos vías: la receta o el tecleado a mano.
+  scope :con_costo,  -> { where("cost > 0 OR components_cost > 0") }
 
   # "Margherita 32 cm APLICACION" -> ["Margherita 32 cm", "APLICACION"]
   # "Austral Calafate 500cc"      -> ["Austral Calafate 500cc", nil]
@@ -27,7 +29,30 @@ class Product < ApplicationRecord
 
   def margin = price && cost&.positive? ? price - cost : nil
 
-  def cost_value = cost.to_f.positive? ? cost.to_f : nil
+  # Fudo guarda DOS costos y la API los da en campos separados:
+  #   cost            -> el que alguien tecleó en "Costo → Editar"
+  #   components_cost -> el que Fudo calcula sumando la receta
+  #
+  # Manda la receta cuando existe: se recalcula sola cuando cambia el precio de un insumo,
+  # mientras que el tecleado se queda con el valor del día que se escribió. Son 46 los que
+  # tienen los dos y no siempre coinciden —el Austral Calafate dice $2.123 a mano y $1.062
+  # por receta, justo el doble—.
+  #
+  # Leer solo el tecleado era el motivo de que la Margherita 32 APLICACION saliera "sin
+  # costo" mientras Fudo enseñaba $4.914,91. Con los dos se pasa del 12% al 90% de la
+  # facturación con costo conocido.
+  def recipe_cost = components_cost.to_f.positive? ? components_cost.to_f : nil
+  def typed_cost  = cost.to_f.positive? ? cost.to_f : nil
+  def cost_value  = recipe_cost || typed_cost
+
+  # De dónde salió, para poder decirlo en pantalla: una receta y un número tecleado hace
+  # meses no merecen la misma confianza.
+  def cost_source
+    return :receta   if recipe_cost
+    return :tecleado if typed_cost
+
+    nil
+  end
 
   # La carta sin IVA. El costo de Fudo es neto y el precio lleva IVA; para compararlos
   # hay que ponerlos en la misma moneda.

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_25_143051) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_26_035143) do
   create_table "daily_sales", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.date "date", null: false
@@ -119,6 +119,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_25_143051) do
     t.string "category_name"
     t.string "channel"
     t.string "code"
+    t.decimal "components_cost", precision: 14, scale: 4
     t.decimal "cost", precision: 14, scale: 2
     t.datetime "created_at", null: false
     t.integer "fudo_category_id"

@@ -385,4 +385,65 @@ end
     assert_equal %w[Disparate Medio Leve],
                  ProductPrices.new(period: "3", to: HOY).costos_sospechosos.map(&:name)
   end
+
+  # --- Los dos costos de Fudo ------------------------------------------------------
+
+  test "el costo de la receta vale aunque no haya ninguno tecleado a mano" do
+    # El caso que destapó esto: la Margherita 32 APLICACION salía "sin costo" en el
+    # panel mientras Fudo enseñaba $4.914,91. El tecleado estaba vacío; el de la receta no.
+    p = producto(1, "Margherita 32 cm APLICACION", 11_600)
+    p.update!(cost: nil, components_cost: 4_914.914)
+    6.times { |i| vender(1, "Margherita 32 cm APLICACION", 14_250, on: HOY - i) }
+
+    c = ProductPrices.new(period: "3", to: HOY).con_ventas.first.canales.first
+
+    assert_not c.sin_costo?, "tiene receta: no puede salir como que no tiene costo"
+    assert_in_delta 4_914.91, c.costo, 0.01
+    assert_equal :receta, p.cost_source
+    assert_in_delta 59.0, c.margen_pct, 0.5
+  end
+
+  test "con los dos costos manda la receta, que es la que se actualiza sola" do
+    # El Austral Calafate: $2.123 tecleado y $1.062 por receta, justo el doble.
+    p = producto(1, "Austral Calafate 500cc", 5_500)
+    p.update!(cost: 2_123.3, components_cost: 1_061.65)
+
+    assert_in_delta 1_061.65, p.cost_value, 0.01,
+                    "el tecleado se queda con el valor del día que se escribió"
+    assert_in_delta 2_123.3, p.typed_cost, 0.01, "pero el dato sigue guardado, no se pierde"
+    assert_equal :receta, p.cost_source
+  end
+
+  test "sin receta se usa el tecleado, y se dice que es el tecleado" do
+    p = producto(1, "Coca cola Original", 2_900)
+    p.update!(cost: 519, components_cost: nil)
+
+    assert_in_delta 519, p.cost_value, 0.01
+    assert_nil p.recipe_cost
+    assert_equal :tecleado, p.cost_source
+  end
+
+  test "sin ninguno de los dos no hay costo ni origen que enseñar" do
+    p = producto(1, "Nada PLATO", 10_000)
+
+    assert_nil p.cost_value
+    assert_nil p.cost_source
+  end
+
+  test "una receta a cero cuenta como que no hay receta" do
+    p = producto(1, "Rara PLATO", 5_000)
+    p.update!(cost: 800, components_cost: 0)
+
+    assert_nil p.recipe_cost, "un 0 no es un costo: diría 100% de margen"
+    assert_in_delta 800, p.cost_value, 0.01
+    assert_equal :tecleado, p.cost_source
+  end
+
+  test "un costo de receta imposible también se marca para revisar" do
+    p = producto(1, "Prosciutto crudo", 2_200)
+    p.update!(components_cost: 19_561)
+
+    assert p.cost_impossible?
+    assert_equal ["Prosciutto crudo"], ProductPrices.new(period: "3", to: HOY).costos_sospechosos.map(&:name)
+  end
 end

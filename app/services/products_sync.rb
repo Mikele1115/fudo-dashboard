@@ -38,7 +38,8 @@ class ProductsSync
       producto.assign_attributes(
         name: p[:name], base_name: base, channel: canal,
         code: p[:code], fudo_category_id: p[:category_id],
-        category_name: p[:category_name], price: p[:price], cost: p[:cost],
+        category_name: p[:category_name], price: p[:price],
+        cost: p[:cost], components_cost: p[:components_cost],
         active: p[:active], synced_at: Time.current
       )
       producto.save!

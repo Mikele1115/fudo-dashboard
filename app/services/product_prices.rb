@@ -65,9 +65,9 @@ class ProductPrices
       (ahora - antes) / antes * 100.0
     end
 
-    # El costo que Fudo guarda para este producto, neto de IVA. nil cuando no hay nada
-    # cargado, que hoy es lo normal: 253 de las 281 filas del panel no tienen costo.
-    def costo      = product.cost.to_f.positive? ? product.cost.to_f : nil
+    # El costo que Fudo guarda para este producto, neto de IVA: el de su receta si la
+    # tiene, y si no el tecleado a mano. nil cuando no hay ninguno de los dos.
+    def costo      = product.cost_value
     def sin_costo? = costo.nil?
 
     # Lo que se cobra hoy, sin IVA, para poder restarle el costo. Misma ventana que el
@@ -217,7 +217,7 @@ class ProductPrices
   # ENTERO y no solo lo vendido en el período, porque un producto parado conserva su
   # costo torcido y nadie lo mira. Filtrando por ventas se marcaban 5 de 13.
   def costos_sospechosos
-    @costos_sospechosos ||= Product.where("cost > 0").select(&:cost_impossible?)
+    @costos_sospechosos ||= Product.con_costo.select(&:cost_impossible?)
                                    .sort_by { |p| -p.cost_ratio }
   end
 

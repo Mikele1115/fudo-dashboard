@@ -13,8 +13,9 @@ class ProductsSyncTest < ActiveSupport::TestCase
     def products = @catalogo
   end
 
-  def producto(id:, name:, price:, cost: nil, active: true)
-    { id:, name:, price:, cost:, active:, code: nil, category_id: 1, category_name: "Pizzas" }
+  def producto(id:, name:, price:, cost: nil, components_cost: nil, active: true)
+    { id:, name:, price:, cost:, components_cost:, active:, code: nil,
+      category_id: 1, category_name: "Pizzas" }
   end
 
   def sincronizar(catalogo, hoy: HOY)
@@ -87,5 +88,31 @@ class ProductsSyncTest < ActiveSupport::TestCase
 
     assert_equal 7_000, Product.find_by(fudo_product_id: 1).margin
     assert_nil Product.find_by(fudo_product_id: 2).margin, "sin costo no hay margen"
+  end
+
+  test "guarda los dos costos de Fudo, el de la receta y el tecleado" do
+    # La API los da en campos separados y hasta ahora solo leíamos el tecleado: por eso
+    # la Margherita 32 APLICACION salía sin costo mientras Fudo enseñaba $4.914,91.
+    sincronizar([producto(id: 1, name: "Margherita 32 cm APLICACION", price: 11_600,
+                          cost: nil, components_cost: 4_914.914),
+                 producto(id: 2, name: "Coca cola Original", price: 2_900, cost: 519)])
+
+    pizza = Product.find_by(fudo_product_id: 1)
+    assert_in_delta 4_914.914, pizza.components_cost, 0.001
+    assert_nil pizza.cost
+    assert_equal :receta, pizza.cost_source
+
+    bebida = Product.find_by(fudo_product_id: 2)
+    assert_nil bebida.components_cost
+    assert_equal :tecleado, bebida.cost_source
+  end
+
+  test "si se borra la receta en Fudo, el costo deja de estar" do
+    sincronizar([producto(id: 1, name: "Pizza PLATO", price: 10_000, components_cost: 2_000)])
+    assert_in_delta 2_000, Product.find_by(fudo_product_id: 1).cost_value, 0.01
+
+    sincronizar([producto(id: 1, name: "Pizza PLATO", price: 10_000, components_cost: nil)])
+    assert_nil Product.find_by(fudo_product_id: 1).cost_value,
+               "el sync refleja Fudo, no se queda con el último valor que vio"
   end
 end

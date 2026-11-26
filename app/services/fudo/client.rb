@@ -197,13 +197,20 @@ module Fudo
     # noche; el histórico hacia atrás sale de las líneas de venta (ver sale_items).
     #
     # Devuelve: { id:, name:, price:, cost:, active:, code:, category_id:, category_name: }
+    # El catálogo, con los DOS costos que guarda Fudo.
+    #
+    # Hacen falta dos pasadas y no es capricho:
+    #   - Sin fields[product] la respuesta trae la relación con la categoría, pero NO
+    #     trae componentsCost: ese campo solo aparece si se pide explícitamente.
+    #   - Con fields[product] sí viene componentsCost, pero la relación productCategory
+    #     se queda a nil (y meter productCategory en fields da 400: no está en su lista).
+    # Comprobado contra la cuenta real con las dos variantes. Así que se piden las dos
+    # cosas por separado y se juntan por id.
     def products
+      componentes = component_costs
       found = []
       page  = 1
       loop do
-        # Sin fields[product]: la API no acepta productCategory ahí (devuelve 400 con la
-        # lista de campos válidos). Los atributos de un producto son pocos, así que se
-        # piden todos y se usa lo que hace falta.
         body = get("/products",
                    "include"      => "productCategory",
                    "sort"         => "id",
@@ -220,6 +227,8 @@ module Fudo
             name:          attrs["name"].to_s,
             price:         attrs["price"]&.to_f,
             cost:          attrs["cost"]&.to_f,
+            # El de la receta, de la otra pasada. nil cuando el producto no tiene ficha.
+            components_cost: componentes[row["id"].to_i],
             active:        attrs["active"] ? true : false,
             code:          attrs["code"].presence,
             category_id:   cat_ref && cat_ref["id"].to_i,
@@ -231,6 +240,30 @@ module Fudo
         page += 1
       end
       found
+    end
+
+    # { id_producto => costo de su receta }. Solo los que tienen ficha técnica cargada:
+    # 439 de 1.179 en la cuenta real, pero son el 90% de lo que se factura.
+    def component_costs
+      costos = {}
+      page   = 1
+      loop do
+        body = get("/products",
+                   "fields[product]" => "componentsCost",
+                   "sort"            => "id",
+                   "page[size]"      => PAGE_SIZE,
+                   "page[number]"    => page)
+        rows = body.fetch("data", [])
+        rows.each do |row|
+          valor = row.dig("attributes", "componentsCost")
+          costos[row["id"].to_i] = valor.to_f if valor.to_f.positive?
+        end
+        break if rows.size < PAGE_SIZE
+
+        page += 1
+      end
+      @logger.info "Fudo: #{costos.size} productos con costo de receta"
+      costos
     end
 
     # Líneas de venta entre dos instantes: qué producto, cuántas unidades y a cuánto.
