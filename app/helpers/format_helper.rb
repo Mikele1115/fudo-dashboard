@@ -65,7 +65,7 @@ module FormatHelper
     # tiene que verse en Fudo, que es donde se arregla.
     if canal.margen_negativo?
       return safe_join([money(canal.costo),
-                        tag.span("revisar", class: "tag tag--warn",
+                        tag.span("revisar", class: "tag tag--error",
                                  title: "El costo cargado (#{money(canal.costo)}) es mayor que lo que se cobra sin IVA (#{money(canal.precio_neto)}). Hay que revisarlo en Fudo.")], " ")
     end
 
