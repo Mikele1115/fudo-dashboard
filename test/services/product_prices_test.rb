@@ -446,4 +446,80 @@ end
     assert p.cost_impossible?
     assert_equal ["Prosciutto crudo"], ProductPrices.new(period: "3", to: HOY).costos_sospechosos.map(&:name)
   end
+
+  # --- Recetas que se disparan en un canal -----------------------------------------
+
+  # Un menú donde el canal de app añade ~2.500 de comisión a cada plato, que es lo normal.
+  def menu_con_comision(recargo_silvestre: 2_500)
+    {"Margherita" => 2_500, "Serrano" => 2_400, "Gamberetti" => 2_600,
+     "Pancetta" => 2_450, "Diavola" => 2_550}.each_with_index do |(nombre, recargo), i|
+      producto(i * 2 + 1, "#{nombre} 32 cm PLATO", 11_400).update!(components_cost: 2_000)
+      producto(i * 2 + 2, "#{nombre} 32 cm APLICACION", 14_250).update!(components_cost: 2_000 + recargo)
+      6.times { |j| vender(i * 2 + 1, "#{nombre} 32 cm PLATO", 11_400, on: HOY - j) }
+      6.times { |j| vender(i * 2 + 2, "#{nombre} 32 cm APLICACION", 14_250, on: HOY - j) }
+    end
+    producto(97, "Silvestre 32 cm PLATO", 11_400).update!(components_cost: 2_000)
+    producto(98, "Silvestre 32 cm APLICACION", 14_250).update!(components_cost: 2_000 + recargo_silvestre)
+    6.times { |j| vender(97, "Silvestre 32 cm PLATO", 11_400, on: HOY - j) }
+    6.times { |j| vender(98, "Silvestre 32 cm APLICACION", 14_250, on: HOY - j) }
+  end
+
+  test "la comisión de la app no convierte a medio menú en sospechoso" do
+    # Todos los platos pagan comisión: si el aviso saltara por eso no serviría de nada.
+    menu_con_comision
+
+    a = ProductPrices.new(period: "3", to: HOY)
+
+    assert_in_delta 2_500, a.recargo_tipico, 100, "la vara sale del propio menú"
+    assert_empty a.recetas_disparadas
+  end
+
+  test "un canal que se pasa del doble de lo normal sí salta" do
+    # La Silvestre 32 cm: $2.583 por salón y $11.261 por app, cuando lo normal son $2.928.
+    menu_con_comision(recargo_silvestre: 8_678)
+
+    disparadas = ProductPrices.new(period: "3", to: HOY).recetas_disparadas
+
+    assert_equal 1, disparadas.size
+    grupo, canal, recargo = disparadas.first
+    assert_equal "Silvestre 32 cm", grupo.name
+    assert_equal "APLICACION", canal.label
+    assert_in_delta 8_678, recargo, 1
+  end
+
+  test "la vara se mueve con el menú: si sube la comisión, no empieza a marcar todo" do
+    # Mismo menú con la comisión al triple. El reparto se mueve entero y nadie se dispara.
+    {"Margherita" => 7_500, "Serrano" => 7_200, "Gamberetti" => 7_800,
+     "Pancetta" => 7_350, "Diavola" => 7_650}.each_with_index do |(nombre, recargo), i|
+      producto(i * 2 + 1, "#{nombre} 32 cm PLATO", 11_400).update!(components_cost: 2_000)
+      producto(i * 2 + 2, "#{nombre} 32 cm APLICACION", 14_250).update!(components_cost: 2_000 + recargo)
+      6.times { |j| vender(i * 2 + 1, "#{nombre} 32 cm PLATO", 11_400, on: HOY - j) }
+      6.times { |j| vender(i * 2 + 2, "#{nombre} 32 cm APLICACION", 14_250, on: HOY - j) }
+    end
+
+    a = ProductPrices.new(period: "3", to: HOY)
+
+    assert_in_delta 7_500, a.recargo_tipico, 300
+    assert_empty a.recetas_disparadas, "un recargo alto pero parejo no es un error"
+  end
+
+  test "un plato de un solo canal no tiene con qué compararse" do
+    producto(1, "Coca cola Original", 2_900).update!(components_cost: 2_800)
+    6.times { |j| vender(1, "Coca cola Original", 2_900, on: HOY - j) }
+
+    a = ProductPrices.new(period: "3", to: HOY)
+
+    assert_equal 0, a.con_ventas.first.recargo(a.con_ventas.first.canales.first),
+                 "contra sí mismo el recargo es cero, no un disparate"
+    assert_empty a.recetas_disparadas
+  end
+
+  test "una receta rara de un producto que no vende no entra aquí" do
+    # Ya la coge «Costos por revisar»; repetirla solo haría ruido.
+    menu_con_comision # ya trae la Silvestre por PLATO y por APLICACION
+    producto(99, "Silvestre 32 cm DELIVERY", 11_400).update!(components_cost: 50_000)
+
+    assert_empty ProductPrices.new(period: "3", to: HOY).recetas_disparadas,
+                 "sin ventas no se opina"
+  end
 end

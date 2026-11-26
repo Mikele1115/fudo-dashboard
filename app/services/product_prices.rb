@@ -42,6 +42,15 @@ class ProductPrices
   # hace medio año: 72 en la lista en vez de los 22 que están vivos.
   VENTANA_CARTA = 30
 
+  # Cuánto puede encarecer un canal el mismo plato antes de ser sospechoso.
+  #
+  # El canal de aplicación mete su comisión DENTRO de la receta, así que su costo es
+  # legítimamente mayor que el de salón: no se puede marcar por eso. Medido sobre los 48
+  # platos que tienen receta por los dos canales, la mediana del recargo es $2.928, y
+  # solo uno se pasa del doble: la Silvestre 32 cm, que añade $8.678 en vez de $2.928.
+  # El umbral sale de ese reparto, no de un número elegido a dedo.
+  RECARGO_FACTOR = 2
+
   Canal = Struct.new(:channel, :product, :carta, :cobrado, :unidades, :precios_distintos,
                      :antes, :antes_n, :ahora, :ahora_n, :reciente, :reciente_n,
                      keyword_init: true) do
@@ -151,6 +160,16 @@ class ProductPrices
       utiles.sum { |c| c.margen_pct * c.unidades } / peso
     end
 
+    # El canal más barato del plato es la referencia: normalmente el de salón, que no
+    # lleva comisión dentro de la receta.
+    def costo_base = con_costo.filter_map(&:costo).min
+
+    # Cuánto encarece este canal el mismo plato frente al más barato.
+    def recargo(canal)
+      base = costo_base
+      canal.costo && base ? canal.costo - base : nil
+    end
+
     def impacto = canales.filter_map(&:impacto).sum
     def trend   = change_pct.nil? ? "sin comparación" : (change_pct.abs < STABLE_PCT ? "estable" : (change_pct.positive? ? "alza" : "baja"))
   end
@@ -220,6 +239,36 @@ class ProductPrices
     @costos_sospechosos ||= Product.con_costo.select(&:cost_impossible?)
                                    .sort_by { |p| -p.cost_ratio }
   end
+
+  # Lo que suele encarecer un canal, medido sobre el menú entero. Es la vara contra la
+  # que se juzga si una receta se dispara, y se recalcula sola: si mañana sube la
+  # comisión de la app, sube la vara y no empieza a marcar medio menú.
+  def recargo_tipico
+    @recargo_tipico ||= ComparisonWindow.median(
+      grupos.flat_map { |g| g.canales.filter_map { |c| g.recargo(c) } }.select(&:positive?)
+    )
+  end
+
+  # Canales cuyo costo se dispara frente al mismo plato por otro canal. Casi siempre es
+  # una cantidad mal puesta en la ficha técnica: la Silvestre 32 cm cuesta $2.583 por
+  # salón y $11.261 por aplicación, y la comisión no explica la diferencia.
+  #
+  # Solo entran canales que venden: una receta rara de un producto muerto ya la coge
+  # «Costos por revisar», y aquí solo estorbaría.
+  def recetas_disparadas
+    @recetas_disparadas ||= begin
+      vara = recargo_tipico.to_f * RECARGO_FACTOR
+      if vara.zero?
+        []
+      else
+        con_ventas.flat_map { |g|
+          g.vendidos.filter_map { |c| [g, c, g.recargo(c)] if g.recargo(c).to_f > vara }
+        }.sort_by { |(_, _, r)| -r }
+      end
+    end
+  end
+
+  def receta_disparada?(grupo) = recetas_disparadas.any? { |(g, _, _)| g.equal?(grupo) }
 
   def subieron = con_ventas.select { |g| g.trend == "alza" }
   def bajaron  = con_ventas.select { |g| g.trend == "baja" }

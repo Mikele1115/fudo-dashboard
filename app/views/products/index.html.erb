@@ -114,6 +114,9 @@
               <% end %>
               <% if g.margen_negativo? %>
                 <span class="tag tag--warn" title="El costo cargado en Fudo es mayor que lo que se cobra: hay que revisarlo">revisar costo</span>
+              <% end %>
+              <% if a.receta_disparada?(g) %>
+                <span class="tag tag--warn" title="Su receta cuesta mucho más por un canal que por otro, bastante más de lo que explica la comisión de la app">revisar receta</span>
               <% end %></td>
           <td class="muted small"><%= g.vendidos.map(&:label).join(" · ") %></td>
           <td><strong><%= money(principal.cobrado) %></strong>
@@ -251,6 +254,34 @@
               <td class="num muted"><%= money(p.price_net) %></td>
               <td class="num txt--bad"><%= veces(p.cost_ratio) %></td>
               <td class="num muted"><%= ultima_venta(p) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% end %>
+
+    <% if a.recetas_disparadas.any? %>
+      <h3 class="kpi__subtitle txt--bad">Recetas que se disparan en un canal (<%= int(a.recetas_disparadas.size) %>)</h3>
+      <p class="muted small">
+        El mismo plato cuesta mucho más por un canal que por otro. Algo de diferencia es
+        normal: el canal de aplicación lleva su comisión dentro de la receta, y de mediana
+        son <%= money(a.recargo_tipico) %> más. Aquí salen los que se pasan del doble de eso,
+        que ya no lo explica la comisión sino una cantidad mal puesta en la ficha técnica.
+      </p>
+      <table class="table table--compact">
+        <thead><tr><th>Plato</th><th>Canal</th><th class="num">Costo</th><th class="num">El más barato</th>
+          <th class="num">De más</th><th class="num">Margen</th><th class="num">Facturado</th></tr></thead>
+        <tbody>
+          <% a.recetas_disparadas.each do |grupo, canal, recargo| %>
+            <tr>
+              <td><%= link_to grupo.name, product_path(canal.product.fudo_product_id, period: a.period_key) %>
+                  <%= fudo_edit_link(:product, canal.product.fudo_product_id, titulo: "Revisar la ficha técnica en Fudo") %></td>
+              <td class="muted"><%= canal.label %></td>
+              <td class="num"><%= money(canal.costo) %></td>
+              <td class="num muted"><%= money(grupo.costo_base) %></td>
+              <td class="num txt--bad"><%= money(recargo) %></td>
+              <td class="num"><%= margen_celda(canal) %></td>
+              <td class="num muted"><%= money(canal.cobrado.to_f * canal.unidades) %></td>
             </tr>
           <% end %>
         </tbody>

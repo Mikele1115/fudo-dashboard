@@ -98,4 +98,40 @@ class ProductsControllerTest < ActionDispatch::IntegrationTest
     assert_select ".tag.tag--na", text: "sin costo"
     assert_match(/Sin costo en APLICACION/, response.body)
   end
+
+  test "un plato cuya receta se dispara en un canal sale marcado y listado" do
+    # Un menú donde la app añade ~2.500 a todos, y una Silvestre que añade 8.678.
+    %w[Margherita Serrano Gamberetti Pancetta Diavola].each_with_index do |nombre, i|
+      producto(i * 2 + 1, "#{nombre} 32 cm PLATO", 11_400).update!(components_cost: 2_000)
+      producto(i * 2 + 2, "#{nombre} 32 cm APLICACION", 14_250).update!(components_cost: 4_500)
+      vender(i * 2 + 1, "#{nombre} 32 cm PLATO", 11_400)
+      vender(i * 2 + 2, "#{nombre} 32 cm APLICACION", 14_250)
+    end
+    producto(97, "Silvestre 32 cm PLATO", 11_400).update!(components_cost: 2_000)
+    producto(98, "Silvestre 32 cm APLICACION", 14_250).update!(components_cost: 10_678)
+    vender(97, "Silvestre 32 cm PLATO", 11_400)
+    vender(98, "Silvestre 32 cm APLICACION", 14_250)
+
+    get products_path(all: 1)
+
+    assert_response :success
+    assert_select ".tag", { text: "revisar receta", count: 1 },
+                  "solo la Silvestre: las otras pagan la misma comisión"
+    assert_select "h3", text: /Recetas que se disparan en un canal \(1\)/
+  end
+
+  test "si todos los canales pagan lo mismo no se marca a nadie" do
+    %w[Margherita Serrano Gamberetti].each_with_index do |nombre, i|
+      producto(i * 2 + 1, "#{nombre} 32 cm PLATO", 11_400).update!(components_cost: 2_000)
+      producto(i * 2 + 2, "#{nombre} 32 cm APLICACION", 14_250).update!(components_cost: 4_500)
+      vender(i * 2 + 1, "#{nombre} 32 cm PLATO", 11_400)
+      vender(i * 2 + 2, "#{nombre} 32 cm APLICACION", 14_250)
+    end
+
+    get products_path(all: 1)
+
+    assert_response :success
+    assert_select ".tag", { text: "revisar receta", count: 0 }
+    assert_select "h3", { text: /Recetas que se disparan/, count: 0 }
+  end
 end
