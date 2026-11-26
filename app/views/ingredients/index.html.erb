@@ -38,9 +38,6 @@
       <% end %>
     </details>
   </div>
-  <%# Ojo: el botón de actualizar va FUERA del formulario del período.
-      button_to genera su propio <form>, y un formulario dentro de otro es HTML
-      inválido: el navegador ignora el interno y manda el GET del de fuera. %>
   <div class="datepicker">
     <form method="get" action="<%= ingredients_path %>" class="inline">
       <%= hidden_field_tag :sort, @sort %>
@@ -54,8 +51,6 @@
                 title: "Compras donde el monto cuadra pero la cantidad cargada no" do %>
       Revisar cargas<% if @typos.to_i.positive? %> (<%= int(@typos) %>)<% end %>
     <% end %>
-    <%= button_to "Actualizar compras", sync_ingredients_path, params: { period: a.period_key },
-                  class: "btn btn--light", form_class: "inline" %>
   </div>
 </section>
 
@@ -63,7 +58,7 @@
   <section class="card">
     <h2>Todavía no hay compras descargadas</h2>
     <p class="muted">
-      Pulsa <strong>Actualizar compras</strong> para traer desde Fudo el historial de compras de insumos.
+      Pulsa <strong>Sincronizar</strong>, abajo a la izquierda, para traer desde Fudo el historial de compras de insumos.
       La primera descarga trae <%= PurchasesSync::DEFAULT_YEARS %> años y puede tardar un par de minutos.
     </p>
   </section>

@@ -7,11 +7,11 @@ class SyncsController < ApplicationController
     elsif !AppSettings.fudo_configured?
       redirect_back_or_to root_path, alert: "Falta configurar #{AppSettings.fudo_missing.join(' y ')} en el archivo .env."
     else
-      # Ventas y precios de venta: este botón sustituye al de "Actualizar productos" que
-      # había en esa pantalla. Sin correos a propósito, ver SyncSalesJob.
-      SyncSalesJob.perform_later(requested_date.to_s, with_products: true)
+      # Es el único botón del panel: hace lo mismo que la corrida nocturna salvo el
+      # correo. Sin notify a propósito, ver SyncSalesJob.
+      SyncSalesJob.perform_later(requested_date.to_s, with_purchases: true, notify: false)
       redirect_back_or_to root_path,
-                          notice: "Sincronización iniciada: ventas y productos. La primera vez puede tardar unos minutos."
+                          notice: "Sincronización iniciada: ventas, compras y productos. Puede tardar unos minutos."
     end
   end
 end

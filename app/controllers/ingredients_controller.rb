@@ -40,16 +40,6 @@ class IngredientsController < ApplicationController
     @history = IngredientPurchase.where(fudo_ingredient_id: @row.ingredient_id).chronological
   end
 
-  # Descarga de Fudo las compras (botón "Actualizar compras").
-  def sync
-    run = PurchasesSync.catch_up!
-    IngredientsSync.run!   # trae la categoría que tengan en Fudo ahora mismo
-    IngredientClassifier.run!
-    redirect_to ingredients_path(period: params[:period]), notice: run.message
-  rescue StandardError => e
-    redirect_to ingredients_path(period: params[:period]), alert: "No se pudieron actualizar las compras: #{e.message}"
-  end
-
   private
 
   # Las fechas se cuentan desde la ultima compra descargada, no desde hoy: si la

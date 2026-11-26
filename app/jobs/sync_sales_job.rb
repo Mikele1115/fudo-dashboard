@@ -3,7 +3,7 @@
 # Sincroniza con Fudo en segundo plano. Dos usos, con alcance distinto:
 #
 #   nocturno (recurring.yml, 00:00)  -> todo, y además avisa por correo
-#   botón "Sincronizar" del panel    -> ventas y precios de venta, SIN correos
+#   botón "Sincronizar" del panel    -> lo mismo, pero SIN correos
 #
 # El botón no manda correos a propósito. Las alertas de precios van a varias personas
 # y no pueden salir cada vez que alguien pulsa un botón: los saltos de precio se

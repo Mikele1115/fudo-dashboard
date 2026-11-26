@@ -39,17 +39,26 @@ class SyncSalesJobTest < ActiveJob::TestCase
     @originales.each { |(klass, metodo), original| klass.define_singleton_method(metodo, original) }
   end
 
-  test "el botón del panel baja las ventas y los precios de venta" do
-    # Sustituye al botón "Actualizar productos" que había en la pantalla de Productos.
-    SyncSalesJob.perform_now("2026-11-04", with_products: true)
+  test "el botón del panel hace lo mismo que la noche, menos avisar" do
+    # Es el único botón que queda: sustituye a "Actualizar productos" y a
+    # "Actualizar compras", que estaban cada uno en su pantalla.
+    SyncSalesJob.perform_now("2026-11-04", with_purchases: true, notify: false)
 
-    assert_equal ["SalesSync.run!", "ProductsSync.run!", "SaleItemsSync.catch_up!"], Espia.llamadas
+    assert_equal [
+      "SalesSync.run!",
+      "PurchasesSync.catch_up!",
+      "IngredientsSync.run!",
+      "IngredientClassifier.run!",
+      "PriceAlertDetector.run!",
+      "ProductsSync.run!",
+      "SaleItemsSync.catch_up!"
+    ], Espia.llamadas
   end
 
   test "el botón del panel NO manda correos" do
     # Las alertas de precios van a varias personas: no pueden salir cada vez que
     # alguien pulsa un botón. Se detectan igual y el aviso sale por la noche.
-    SyncSalesJob.perform_now("2026-11-04", with_products: true)
+    SyncSalesJob.perform_now("2026-11-04", with_purchases: true, notify: false)
 
     assert_not_includes Espia.llamadas, "AlertNotifier.call"
   end
