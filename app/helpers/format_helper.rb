@@ -92,6 +92,21 @@ module FormatHelper
     "solo el #{pct_plano(cobertura)} de lo facturado tiene costo"
   end
 
+  # "19,2×". Cuántas veces el costo cargado es el precio: se entiende de un vistazo
+  # mucho mejor que un "-1.819%", que hay que pararse a descifrar.
+  def veces(razon)
+    return "—" if razon.nil?
+
+    format("%.1f×", razon).tr(".", ",")
+  end
+
+  # Cuándo se vendió por última vez. Dice si el costo roto le pega a algo que vendes
+  # hoy o a un producto parado, que también hay que arreglar pero corre menos prisa.
+  def ultima_venta(producto)
+    fecha = SaleItem.cobradas.where(fudo_product_id: producto.fudo_product_id).maximum(:sold_on)
+    fecha ? fecha.strftime("%d/%m/%Y") : "nunca"
+  end
+
   # Para el correo (los clientes de correo no cargan CSS externo): estilos en línea.
   def pct_inline(current, base)
     v = pct_value(current, base)

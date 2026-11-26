@@ -231,23 +231,24 @@
     <% if a.costos_sospechosos.any? %>
       <h3 class="kpi__subtitle txt--bad">Costos por revisar (<%= int(a.costos_sospechosos.size) %>)</h3>
       <p class="muted small">
-        El costo cargado es mayor que lo que se cobra sin IVA. El dato se deja como está
-        para que salte a la vista; se corrige en Fudo.
+        El costo cargado es mayor que el precio de carta sin IVA: no puede ser. Se mira el
+        catálogo entero, también los productos parados, porque un costo torcido no se arregla
+        solo por dejar de vender. El dato se deja como está; se corrige en Fudo.
       </p>
       <table class="table table--compact">
-        <thead><tr><th>Plato</th><th>Canal</th><th class="num">Costo</th><th class="num">Cobrado sin IVA</th><th class="num">Margen</th></tr></thead>
+        <thead><tr><th>Producto</th><th class="num">Costo cargado</th><th class="num">Carta sin IVA</th>
+          <th class="num">Cuántas veces</th><th class="num">Última venta</th></tr></thead>
         <tbody>
-          <% a.costos_sospechosos.each do |g| %>
-            <% g.con_costo.select(&:margen_negativo?).each do |c| %>
-              <tr>
-                <td><%= link_to g.name, product_path(c.product.fudo_product_id, period: a.period_key) %>
-                    <%= fudo_edit_link(:product, c.product.fudo_product_id, titulo: "Corregir el costo en Fudo") %></td>
-                <td class="muted"><%= c.label %></td>
-                <td class="num"><%= money(c.costo) %></td>
-                <td class="num muted"><%= money(c.precio_neto) %></td>
-                <td class="num txt--bad"><%= pct_plano(c.margen_pct) %></td>
-              </tr>
-            <% end %>
+          <% a.costos_sospechosos.each do |p| %>
+            <tr>
+              <td><%= link_to p.name, product_path(p.fudo_product_id, period: a.period_key) %>
+                  <%= fudo_edit_link(:product, p.fudo_product_id, titulo: "Corregir el costo en Fudo") %>
+                  <%= content_tag(:span, "inactivo", class: "tag tag--na") unless p.active %></td>
+              <td class="num"><%= money(p.cost_value) %></td>
+              <td class="num muted"><%= money(p.price_net) %></td>
+              <td class="num txt--bad"><%= veces(p.cost_ratio) %></td>
+              <td class="num muted"><%= ultima_venta(p) %></td>
+            </tr>
           <% end %>
         </tbody>
       </table>

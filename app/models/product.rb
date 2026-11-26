@@ -27,5 +27,27 @@ class Product < ApplicationRecord
 
   def margin = price && cost&.positive? ? price - cost : nil
 
+  def cost_value = cost.to_f.positive? ? cost.to_f : nil
+
+  # La carta sin IVA. El costo de Fudo es neto y el precio lleva IVA; para compararlos
+  # hay que ponerlos en la misma moneda.
+  def price_net
+    price.to_f.positive? ? price.to_f / (1 + AppSettings.vat_rate) : nil
+  end
+
+  # Un costo por encima del precio de venta no puede ser. Se juzga contra la carta y no
+  # contra lo cobrado a propósito: la carta la tienen todos, también los productos
+  # parados, que es justo donde nadie mira. Mirando solo lo cobrado se escapaban 8 de
+  # los 13 costos rotos del catálogo, entre ellos cuatro agregados cuya receta se come
+  # un kilo entero por porción: el Prosciutto crudo cuesta $19.561, que es el kilo.
+  def cost_impossible?
+    c = cost_value
+    n = price_net
+    c && n ? c > n : false
+  end
+
+  # Cuántas veces el costo es el precio: "19,2×" se lee mejor que "-1.819%".
+  def cost_ratio = cost_impossible? ? cost_value / price_net : nil
+
   def channel_label = channel.presence || "único"
 end

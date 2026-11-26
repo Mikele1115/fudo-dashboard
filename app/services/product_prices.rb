@@ -65,26 +65,29 @@ class ProductPrices
       (ahora - antes) / antes * 100.0
     end
 
-# El costo que Fudo guarda para este producto, neto de IVA. nil cuando no hay nada
-# cargado, que hoy es lo normal: 253 de las 281 filas del panel no tienen costo.
-def costo      = product.cost.to_f.positive? ? product.cost.to_f : nil
-def sin_costo? = costo.nil?
+    # El costo que Fudo guarda para este producto, neto de IVA. nil cuando no hay nada
+    # cargado, que hoy es lo normal: 253 de las 281 filas del panel no tienen costo.
+    def costo      = product.cost.to_f.positive? ? product.cost.to_f : nil
+    def sin_costo? = costo.nil?
 
-# Lo que se cobra hoy, sin IVA, para poder restarle el costo. Misma ventana que el
-# desvío contra la carta: la pregunta «¿cuánto me deja?» es sobre hoy.
-def precio_neto
-  base = reciente || cobrado
-  base&.positive? ? base / (1 + AppSettings.vat_rate) : nil
-end
+    # Lo que se cobra hoy, sin IVA, para poder restarle el costo. Misma ventana que el
+    # desvío contra la carta: la pregunta «¿cuánto me deja?» es sobre hoy.
+    def precio_neto
+      base = reciente || cobrado
+      base&.positive? ? base / (1 + AppSettings.vat_rate) : nil
+    end
 
-def margen_pesos = costo && precio_neto ? precio_neto - costo : nil
-def margen_pct   = margen_pesos && precio_neto.positive? ? margen_pesos / precio_neto * 100 : nil
+    def margen_pesos = costo && precio_neto ? precio_neto - costo : nil
+    def margen_pct   = margen_pesos && precio_neto.positive? ? margen_pesos / precio_neto * 100 : nil
 
-# Costo por encima del precio: se señala y no se toca. Puede ser un plato gancho,
-# pero en la cuenta real es un costo mal cargado —el Pisco Norterra está a $99.999—.
-def margen_negativo? = margen_pesos&.negative? || false
+    # Costo por encima del precio: se señala y no se toca. Puede ser un plato gancho,
+    # pero en la cuenta real es un costo mal cargado —el Pisco Norterra está a $99.999—.
+    #
+    # Salta por dos vías: contra la carta —vale para todos, incluidos los parados— y
+    # contra lo que se cobra de verdad, que coge al que tiene la carta bien y cobra menos.
+    def margen_negativo? = product.cost_impossible? || margen_pesos&.negative? || false
 
-def fiable?     = unidades >= MIN_UNIDADES
+    def fiable?     = unidades >= MIN_UNIDADES
     def comparable? = change_pct && [antes_n.to_i, ahora_n.to_i].min >= MIN_CONFIDENCE
 
     # Para la pregunta de la carta solo cuentan las ventas recientes: un plato que no se
@@ -132,23 +135,23 @@ def fiable?     = unidades >= MIN_UNIDADES
       comparables.sum { |c| c.change_pct * c.unidades } / peso
     end
 
-# Un plato queda "sin costo" cuando NINGUNO de sus canales vendidos tiene costo.
-# Si un canal lo tiene, el costo de hacer el plato se conoce: vale para los demás.
-def sin_costo?  = vendidos.any? ? vendidos.all?(&:sin_costo?) : canales.all?(&:sin_costo?)
-def con_costo   = vendidos.reject(&:sin_costo?)
-def costo       = con_costo.filter_map(&:costo).min
-def margen_negativo? = con_costo.any?(&:margen_negativo?)
+    # Un plato queda "sin costo" cuando NINGUNO de sus canales vendidos tiene costo.
+    # Si un canal lo tiene, el costo de hacer el plato se conoce: vale para los demás.
+    def sin_costo?  = vendidos.any? ? vendidos.all?(&:sin_costo?) : canales.all?(&:sin_costo?)
+    def con_costo   = vendidos.reject(&:sin_costo?)
+    def costo       = con_costo.filter_map(&:costo).min
+    def margen_negativo? = con_costo.any?(&:margen_negativo?)
 
-# Margen del plato: el de sus canales con costo, ponderado por unidades vendidas.
-def margen_pct
-  utiles = con_costo.select(&:margen_pct)
-  peso = utiles.sum(&:unidades)
-  return nil if peso.zero?
+    # Margen del plato: el de sus canales con costo, ponderado por unidades vendidas.
+    def margen_pct
+      utiles = con_costo.select(&:margen_pct)
+      peso = utiles.sum(&:unidades)
+      return nil if peso.zero?
 
-  utiles.sum { |c| c.margen_pct * c.unidades } / peso
-end
+      utiles.sum { |c| c.margen_pct * c.unidades } / peso
+    end
 
-def impacto = canales.filter_map(&:impacto).sum
+    def impacto = canales.filter_map(&:impacto).sum
     def trend   = change_pct.nil? ? "sin comparación" : (change_pct.abs < STABLE_PCT ? "estable" : (change_pct.positive? ? "alza" : "baja"))
   end
 
@@ -186,34 +189,39 @@ def impacto = canales.filter_map(&:impacto).sum
   # Los que NO se cobran a su precio de carta: donde el catálogo y la realidad discrepan.
   def descuadrados = con_ventas.reject(&:cuadra?)
 
-# Platos sin ningún costo cargado en Fudo, y su peso en la facturación. Es el techo de
-# lo que se puede decir sobre márgenes: sin costo no hay margen que calcular.
-def sin_costo = con_ventas.select(&:sin_costo?)
-def con_costo = con_ventas.reject(&:sin_costo?)
+  # Platos sin ningún costo cargado en Fudo, y su peso en la facturación. Es el techo de
+  # lo que se puede decir sobre márgenes: sin costo no hay margen que calcular.
+  def sin_costo = con_ventas.select(&:sin_costo?)
+  def con_costo = con_ventas.reject(&:sin_costo?)
 
-def ingreso_total     = con_ventas.sum(&:ingreso)
-def ingreso_sin_costo = sin_costo.sum(&:ingreso)
+  def ingreso_total     = con_ventas.sum(&:ingreso)
+  def ingreso_sin_costo = sin_costo.sum(&:ingreso)
 
-def cobertura_costos_pct
-  return nil if ingreso_total.zero?
+  def cobertura_costos_pct
+    return nil if ingreso_total.zero?
 
-  (ingreso_total - ingreso_sin_costo) / ingreso_total * 100.0
-end
+    (ingreso_total - ingreso_sin_costo) / ingreso_total * 100.0
+  end
 
-# Margen medio de lo que SÍ tiene costo, ponderado por lo que factura cada plato.
-# Solo habla de esa parte del menú, y la pantalla dice de qué parte se trata.
-def margen_pct
-  utiles = con_costo.select(&:margen_pct)
-  peso = utiles.sum(&:ingreso)
-  return nil if peso.zero?
+  # Margen medio de lo que SÍ tiene costo, ponderado por lo que factura cada plato.
+  # Solo habla de esa parte del menú, y la pantalla dice de qué parte se trata.
+  def margen_pct
+    utiles = con_costo.select(&:margen_pct)
+    peso = utiles.sum(&:ingreso)
+    return nil if peso.zero?
 
-  utiles.sum { |g| g.margen_pct * g.ingreso } / peso
-end
+    utiles.sum { |g| g.margen_pct * g.ingreso } / peso
+  end
 
-# Costos que no pueden ser: por encima del precio de venta neto.
-def costos_sospechosos = con_costo.select(&:margen_negativo?)
+  # Costos que no pueden ser: por encima de la carta sin IVA. Se recorre el catálogo
+  # ENTERO y no solo lo vendido en el período, porque un producto parado conserva su
+  # costo torcido y nadie lo mira. Filtrando por ventas se marcaban 5 de 13.
+  def costos_sospechosos
+    @costos_sospechosos ||= Product.where("cost > 0").select(&:cost_impossible?)
+                                   .sort_by { |p| -p.cost_ratio }
+  end
 
-def subieron = con_ventas.select { |g| g.trend == "alza" }
+  def subieron = con_ventas.select { |g| g.trend == "alza" }
   def bajaron  = con_ventas.select { |g| g.trend == "baja" }
 
   # Variación media del menú, ponderada por lo que factura cada plato: que suba una

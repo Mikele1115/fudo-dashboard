@@ -322,4 +322,67 @@ test "un canal con costo basta para que el plato no cuente como sin costo" do
   assert_equal ["PLATO"], g.con_costo.map(&:label)
   assert_not_nil g.margen_pct
 end
+
+  test "un costo imposible se marca aunque el producto lleve meses sin venderse" do
+    # El Amaretto Sour está a $99.999 y no vende desde septiembre. Comparando contra lo
+    # cobrado no había contra qué comparar y se escapaba: 8 de los 13 rotos eran así.
+    producto(1, "Amaretto Sour", 5_500, activo: false).update!(cost: 99_999)
+    producto(2, "Vivo PLATO", 10_000).update!(cost: 3_000)
+    6.times { |i| vender(2, "Vivo PLATO", 10_000, on: HOY - i) }
+
+    a = ProductPrices.new(period: "3", to: HOY)
+
+    assert_equal ["Amaretto Sour"], a.costos_sospechosos.map(&:name)
+    assert_empty a.con_ventas.map(&:name) - ["Vivo"], "el parado no entra en el informe de ventas"
+  end
+
+  test "el costo se compara contra la carta SIN IVA, no contra la carta a secas" do
+    # El Jamón pierna: costo $8.119, carta $8.190. Contra la carta parece que deja $71;
+    # contra la carta sin IVA ($6.882) está $1.237 por debajo del costo.
+    p = producto(1, "Jamón pierna", 8_190)
+    p.update!(cost: 8_119)
+
+    assert_operator p.cost_value, :<, p.price, "contra la carta con IVA no saltaría"
+    assert p.cost_impossible?, "pero el IVA no es tuyo: el costo se come el precio"
+    assert_in_delta 6_882.35, p.price_net, 0.5
+  end
+
+  test "un costo que es el precio del insumo por kilo canta solo" do
+    # El Prosciutto crudo se vende a $2.200 y tiene costo $19.561, que es justo lo que
+    # cuesta el kilo de jamón: la receta se está comiendo un kilo por porción.
+    p = producto(1, "Prosciutto crudo", 2_200)
+    p.update!(cost: 19_561)
+
+    assert p.cost_impossible?
+    assert_in_delta 10.6, p.cost_ratio, 0.1, "diez veces el precio de venta"
+  end
+
+  test "un costo normal no se marca, y uno justo en el límite tampoco" do
+    sano  = producto(1, "Coca cola Original", 2_900)
+    sano.update!(cost: 519)
+    justo = producto(2, "Al límite", 1_190)
+    justo.update!(cost: 1_000) # 1.190 / 1,19 = 1.000 exactos: empata, no supera
+
+    assert_not sano.cost_impossible?
+    assert_not justo.cost_impossible?, "empatar no es pasarse"
+    assert_nil sano.cost_ratio
+    assert_empty ProductPrices.new(period: "3", to: HOY).costos_sospechosos
+  end
+
+  test "sin carta no se puede juzgar el costo, y no se inventa" do
+    p = producto(1, "Producto genérico", 0)
+    p.update!(cost: 5_000)
+
+    assert_nil p.price_net
+    assert_not p.cost_impossible?, "sin precio no hay con qué comparar"
+  end
+
+  test "la lista de costos rotos va del más disparatado al menos" do
+    producto(1, "Leve", 8_190).update!(cost: 8_119)        # 1,2x
+    producto(2, "Disparate", 5_500).update!(cost: 99_999)  # 21,6x
+    producto(3, "Medio", 2_200).update!(cost: 19_561)      # 10,6x
+
+    assert_equal %w[Disparate Medio Leve],
+                 ProductPrices.new(period: "3", to: HOY).costos_sospechosos.map(&:name)
+  end
 end
