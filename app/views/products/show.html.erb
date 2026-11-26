@@ -14,8 +14,8 @@
     <h2>Por canal</h2>
     <p class="muted small">Mismo plato, un producto de Fudo por canal. <%= a.comparison_note %></p>
     <table class="table">
-      <thead><tr><th>Canal</th><th>Carta</th><th>Cobrado</th><th>Desvío</th><th>Antes</th>
-        <th>Ahora</th><th>Variación</th><th>Unidades</th><th>Impacto</th></tr></thead>
+      <thead><tr><th>Canal</th><th>Carta</th><th>Cobrado</th><th>Desvío</th><th>Costo</th><th>Margen</th>
+        <th>Antes</th><th>Ahora</th><th>Variación</th><th>Unidades</th><th>Impacto</th></tr></thead>
       <tbody>
         <% @grupo.canales.sort_by { |c| -c.unidades }.each do |c| %>
           <tr>
@@ -26,7 +26,9 @@
             <td class="muted"><%= money(c.carta) %></td>
             <td><strong><%= money(c.cobrado) %></strong></td>
             <td><%= c.desvio_pct && c.desvio_pct.abs >= 1 ? content_tag(:span, format("%+.0f%%", c.desvio_pct), class: "pct pct--down") : content_tag(:span, "—", class: "pct pct--na") %></td>
-            <td class="muted"><%= money(c.antes) %></td>
+<td><%= costo_celda(c) %></td>
+<td><%= margen_celda(c) %></td>
+<td class="muted"><%= money(c.antes) %></td>
             <td><%= money(c.ahora) %></td>
             <td><%= c.comparable? ? pct_badge(100 + c.change_pct, 100) : content_tag(:span, "—", class: "pct pct--na") %></td>
             <td><%= int(c.unidades) %></td>
@@ -35,6 +37,35 @@
         <% end %>
       </tbody>
     </table>
+    <% sin = @grupo.vendidos.select(&:sin_costo?) %>
+    <% if sin.any? %>
+      <p class="muted small">
+        <span class="tag tag--na">sin costo</span>
+        <% if sin.size == @grupo.vendidos.size %>
+          Fudo no tiene costo cargado para este plato, así que no se puede calcular el margen.
+        <% else %>
+          Sin costo en <%= sin.map(&:label).to_sentence(two_words_connector: " y ", last_word_connector: " y ") %>.
+          El margen de esos canales se podría estimar con el costo de los demás, pero aquí no se inventa.
+        <% end %>
+        Se carga en Fudo, en el producto o en su receta.
+      </p>
+    <% end %>
+    <details class="note">
+      <summary>Cómo se calcula el margen</summary>
+      <ul>
+        <li>El costo que da Fudo es <strong>neto, sin IVA</strong>; el precio de venta
+            <strong>lleva IVA</strong>. Comprobado cruzando el costo de cada insumo con lo
+            que pagamos por él: coinciden en 91 de 127 casos.</li>
+        <li>Por eso al precio se le quita el IVA (<%= (AppSettings.vat_rate * 100).round %>%)
+            antes de restarle el costo. Restarlos tal cual inflaría el margen unos 19 puntos.</li>
+        <li>Se usa lo cobrado en los últimos <%= ProductPrices::VENTANA_CARTA %> días, que no
+            siempre es la columna <strong>Cobrado</strong>: esa es la mediana del período que
+            elijas arriba. Para el margen manda lo de ahora. Pasa el ratón por el porcentaje
+            y verás la resta.</li>
+        <li>El margen es solo de <strong>materia prima</strong>. No incluye sueldos, arriendo,
+            luz ni la comisión de la aplicación.</li>
+      </ul>
+    </details>
   </section>
 <% end %>
 

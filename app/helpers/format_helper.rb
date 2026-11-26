@@ -48,7 +48,33 @@ module FormatHelper
     %(<span class="pct #{klass}">#{pct_text(current, base)}</span>).html_safe
   end
 
-  # Para el correo (los clientes de correo no cargan CSS externo): estilos en línea.
+# Un porcentaje que ya ES un porcentaje, sin comparar nada: "79%", "-1.513%".
+def pct_plano(v, decimales: 0)
+  return "—" if v.nil?
+
+  format("%.#{decimales}f%%", v).tr(".", ",")
+end
+
+# El costo de un canal, o el aviso de que Fudo no tiene ninguno cargado. Sin costo no
+# se pone 0: un 0 diría 100% de margen, que es justo la conclusión equivocada.
+def costo_celda(canal)
+  return tag.span("sin costo", class: "tag tag--na",
+                  title: "Fudo no tiene costo cargado para este producto. Se carga en el producto o en su receta.") if canal.sin_costo?
+
+  safe_join([money(canal.costo), tag.span("sin IVA", class: "muted small")], " ")
+end
+
+# El margen sobre el precio sin IVA. Rojo cuando sale negativo: ahí el costo está mal
+# cargado casi siempre, y el dato se deja como está para que se vea.
+def margen_celda(canal)
+  return tag.span("—", class: "pct pct--na") if canal.margen_pct.nil?
+
+  klass = canal.margen_negativo? ? "pct pct--down" : "pct pct--up"
+  titulo = "#{money(canal.precio_neto)} sin IVA − #{money(canal.costo)} de costo = #{money(canal.margen_pesos)}"
+  tag.span(pct_plano(canal.margen_pct), class: klass, title: titulo)
+end
+
+# Para el correo (los clientes de correo no cargan CSS externo): estilos en línea.
   def pct_inline(current, base)
     v = pct_value(current, base)
     return %(<span style="color:#9ca3af;">—</span>).html_safe if v.nil?

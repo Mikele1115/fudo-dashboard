@@ -31,6 +31,13 @@
         <li>Las líneas a precio 0 (promociones y combos) quedan fuera, y las variaciones
             con menos de <%= ProductPrices::MIN_CONFIDENCE %> ventas en algún extremo no
             se muestran.</li>
+        <li><strong>Costo</strong> es el que Fudo guarda para el producto, y es
+            <strong>neto, sin IVA</strong>. El <strong>margen</strong> le quita el IVA al
+            precio antes de restarlo, y mira los últimos <%= ProductPrices::VENTANA_CARTA %>
+            días: por eso no siempre cuadra a ojo con la columna Cobrado, que es la mediana
+            del período. Es margen de materia prima, sin sueldos ni arriendo.</li>
+        <li>Cuando Fudo no tiene costo cargado sale <span class="tag tag--na">sin costo</span>,
+            nunca un cero: un cero diría 100% de margen.</li>
       </ul>
     </details>
   </div>
@@ -56,7 +63,8 @@
 <% visibles = @query.present? ? coincidentes : (@show_all ? @grupos : []) %>
 <section class="card" data-controller="filtro"
          data-filtro-total-value="<%= @grupos.size %>"
-         data-filtro-show-all-when-empty-value="<%= @show_all %>">
+         data-filtro-show-all-when-empty-value="<%= @show_all %>"
+         data-filtro-cosa-value="platos">
   <div class="card--actions">
     <h2>Buscar un plato</h2>
     <form method="get" action="<%= products_path %>" class="toolbar" data-action="submit->filtro#prevent">
@@ -91,8 +99,8 @@
 
   <table class="table table--rows" data-filtro-target="table" <%= "hidden" if visibles.empty? %>>
     <thead>
-      <tr><th>Plato</th><th>Canales</th><th>Cobrado</th><th>Antes</th><th>Variación</th>
-          <th>Unidades</th><th>Facturado</th><th>Impacto</th></tr>
+      <tr><th>Plato</th><th>Canales</th><th>Cobrado</th><th>Costo</th><th>Margen</th><th>Antes</th>
+          <th>Variación</th><th>Unidades</th><th>Facturado</th><th>Impacto</th></tr>
     </thead>
     <tbody>
       <% @grupos.each do |g| %>
@@ -108,7 +116,9 @@
           <td><strong><%= money(principal.cobrado) %></strong>
               <%= content_tag(:span, "≠ carta", class: "tag tag--warn",
                               title: "Carta #{money(principal.carta)}") unless g.cuadra? %></td>
-          <td class="muted"><%= money(principal.antes) %></td>
+<td><%= costo_celda(principal) %></td>
+<td><%= margen_celda(principal) %></td>
+<td class="muted"><%= money(principal.antes) %></td>
           <td><%= g.change_pct ? pct_badge(100 + g.change_pct, 100) : content_tag(:span, "—", class: "pct pct--na") %></td>
           <td><%= int(g.unidades) %></td>
           <td><%= money(g.ingreso) %></td>
@@ -119,7 +129,7 @@
   </table>
 </section>
 
-<section class="kpis kpis--5">
+<section class="kpis kpis--6">
   <%= render layout: "shared/kpi", locals: {
         icon: :money, tono: "blue", label: "Facturado",
         value: money(a.con_ventas.sum(&:ingreso)),
@@ -179,6 +189,60 @@
                 <td class="num"><%= money(c.cobrado) %></td>
                 <td class="num <%= c.desvio_pct.positive? ? 'txt--good' : 'txt--bad' %>">
                   <%= format("%+.0f%%", c.desvio_pct) %></td>
+              </tr>
+            <% end %>
+          <% end %>
+        </tbody>
+      </table>
+    <% end %>
+  <% end %>
+  <%= render layout: "shared/kpi", locals: {
+        icon: :alert, tono: "slate", label: "Sin costo en Fudo",
+        value: int(a.sin_costo.size),
+        delta: a.cobertura_costos_pct ? "solo el #{pct_plano(a.cobertura_costos_pct)} de lo facturado tiene costo" : nil,
+        hint: "Fudo guarda un costo por producto, pero solo si alguien lo cargó o si el plato tiene su receta. Sin ese dato no hay margen que calcular, y es el único que falta: los precios de venta y los de los insumos ya se siguen solos." } do %>
+    <% if a.sin_costo.empty? %>
+      <p class="muted">Todos los platos tienen costo cargado.</p>
+    <% else %>
+      <p class="muted small">
+        <%= int(a.sin_costo.size) %> de <%= int(a.con_ventas.size) %> platos no tienen costo.
+        Los que más facturan, primero: cargarles la receta en Fudo es lo que desbloquea el margen.
+      </p>
+      <table class="table table--compact">
+        <thead><tr><th>Plato</th><th>Canales</th><th class="num">Cobrado</th><th class="num">Facturado</th></tr></thead>
+        <tbody>
+          <% a.sin_costo.sort_by { |g| -g.ingreso }.first(12).each do |g| %>
+            <% pr = g.vendidos.max_by(&:unidades) %>
+            <tr>
+              <td><%= link_to g.name, product_path(pr.product.fudo_product_id, period: a.period_key) %>
+                  <%= fudo_edit_link(:product, pr.product.fudo_product_id, titulo: "Cargar el costo o la receta en Fudo") %></td>
+              <td class="muted"><%= g.vendidos.map(&:label).join(" · ") %></td>
+              <td class="num"><%= money(pr.cobrado) %></td>
+              <td class="num"><%= money(g.ingreso) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    <% end %>
+
+    <% if a.costos_sospechosos.any? %>
+      <h3 class="kpi__subtitle txt--bad">Costo por encima del precio (<%= int(a.costos_sospechosos.size) %>)</h3>
+      <p class="muted small">
+        El costo cargado es mayor que lo que se cobra sin IVA. El dato se deja como está
+        para que salte a la vista; se corrige en Fudo.
+      </p>
+      <table class="table table--compact">
+        <thead><tr><th>Plato</th><th>Canal</th><th class="num">Costo</th><th class="num">Cobrado sin IVA</th><th class="num">Margen</th></tr></thead>
+        <tbody>
+          <% a.costos_sospechosos.each do |g| %>
+            <% g.con_costo.select(&:margen_negativo?).each do |c| %>
+              <tr>
+                <td><%= link_to g.name, product_path(c.product.fudo_product_id, period: a.period_key) %>
+                    <%= fudo_edit_link(:product, c.product.fudo_product_id, titulo: "Corregir el costo en Fudo") %></td>
+                <td class="muted"><%= c.label %></td>
+                <td class="num"><%= money(c.costo) %></td>
+                <td class="num muted"><%= money(c.precio_neto) %></td>
+                <td class="num txt--bad"><%= pct_plano(c.margen_pct) %></td>
               </tr>
             <% end %>
           <% end %>

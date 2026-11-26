@@ -13,7 +13,7 @@ unlinkSync(tmp);
 
 const NOMBRES = ["mozzarella", "harina", "prosciutto", "jamon serrano", "burrata"];
 
-function montar({ texto = "", verTodoSiVacio = false } = {}) {
+function montar({ texto = "", verTodoSiVacio = false, cosa = null } = {}) {
   const p = (extra = {}) => ({ hidden: false, textContent: "", ...extra });
   const c = new Filtro();
   c.inputTarget = { value: texto };
@@ -27,6 +27,9 @@ function montar({ texto = "", verTodoSiVacio = false } = {}) {
   c.hasHistLinkTarget = false;
   c.totalValue = NOMBRES.length;
   c.showAllWhenEmptyValue = verTodoSiVacio;
+  // Stimulus resuelve el valor por defecto de `static values`; aquí se imita, leyendo
+  // la declaración de verdad para que quitarla haga fallar el test.
+  c.cosaValue = cosa ?? Filtro.values?.cosa?.default;
   c.remember = () => {}; // no hay window aquí
   c.filter();
   return c;
@@ -68,6 +71,13 @@ comprueba("  y avisa, con el texto buscado", [c.emptyTarget.hidden, c.queryTarge
 c = montar({ texto: "", verTodoSiVacio: true });
 comprueba("con «ver todos» y la caja vacía salen todas", visibles(c), NOMBRES);
 comprueba("  y lo dice", c.statusTarget.textContent.startsWith("Los 5 insumos del período."), true);
+
+// El mismo buscador lo usa Productos, y ahí no son insumos: son platos.
+c = montar({ texto: "", verTodoSiVacio: true, cosa: "platos" });
+comprueba("cada pantalla nombra lo que lista", c.statusTarget.textContent,
+          "Los 5 platos del período. Haz clic en uno para ver su detalle.");
+c = montar({ texto: "moz", cosa: "platos" });
+comprueba("  también al buscar", c.statusTarget.textContent.startsWith("1 de 5 platos coincide"), true);
 
 c = montar({ texto: "harina", verTodoSiVacio: true });
 comprueba("con «ver todos» escribir sigue filtrando", visibles(c), ["harina"]);

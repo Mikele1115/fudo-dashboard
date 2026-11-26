@@ -1,6 +1,7 @@
 import { Controller } from "@hotwired/stimulus"
 
-// Filtra la tabla de insumos mientras se escribe, sin recargar la página.
+// Filtra una tabla mientras se escribe, sin recargar la página. Lo usan Insumos y
+// Productos; cada pantalla dice cómo se llama lo que lista con data-filtro-cosa-value.
 //
 // Las filas están todas en el HTML y se muestran u ocultan aquí. Pesa un poco más la
 // página, pero es lo que ya hacía antes de que el buscador existiera, y a cambio buscar
@@ -11,7 +12,7 @@ import { Controller } from "@hotwired/stimulus"
 // mismo nada más arrancar, así que no hay parpadeo.
 export default class extends Controller {
   static targets = ["input", "row", "table", "prompt", "status", "empty", "query", "histLink"]
-  static values = { total: Number, showAllWhenEmpty: Boolean }
+  static values = { total: Number, showAllWhenEmpty: Boolean, cosa: { type: String, default: "insumos" } }
 
   connect() {
     this.filter()
@@ -45,10 +46,10 @@ export default class extends Controller {
 
   statusText(q, visibles, verTodo) {
     const cola = " Haz clic en uno para ver su detalle."
-    if (verTodo) return `Los ${this.totalValue} insumos del período.${cola}`
+    if (verTodo) return `Los ${this.totalValue} ${this.cosaValue} del período.${cola}`
 
     const verbo = visibles === 1 ? "coincide" : "coinciden"
-    return `${visibles} de ${this.totalValue} insumos ${verbo} con «${this.inputTarget.value.trim()}».${cola}`
+    return `${visibles} de ${this.totalValue} ${this.cosaValue} ${verbo} con «${this.inputTarget.value.trim()}».${cola}`
   }
 
   describeEmpty() {

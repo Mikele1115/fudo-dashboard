@@ -225,4 +225,101 @@ class ProductPricesTest < ActiveSupport::TestCase
     assert_equal 4, c.unidades
     assert_equal 11_400, c.cobrado, "una línea a 0 hundiría la mediana"
   end
+# --- Costos y margen -------------------------------------------------------------
+
+test "el margen descuenta el IVA del precio antes de restar el costo" do
+  # El costo de Fudo es NETO y el precio de venta lleva IVA. Comparados tal cual, una
+  # Coca a $519 de costo y $2.900 de venta daría 82% de margen; el de verdad es 79%.
+  producto(1, "Coca cola Original", 2_900).update!(cost: 519)
+  6.times { |i| vender(1, "Coca cola Original", 2_900, on: HOY - i) }
+
+  c = ProductPrices.new(period: "3", to: HOY).con_ventas.first.canales.first
+
+  assert_in_delta 2_436.97, c.precio_neto, 0.5, "2.900 con IVA son 2.437 netos"
+  assert_in_delta 1_917.97, c.margen_pesos, 0.5
+  assert_in_delta 78.7, c.margen_pct, 0.1, "no 82,1%: eso sería olvidarse del IVA"
+end
+
+test "un plato sin costo cargado queda señalado, no en cero" do
+  producto(1, "Margherita 32 cm PLATO", 11_400) # cost nil, como 253 de las 281 filas
+  6.times { |i| vender(1, "Margherita 32 cm PLATO", 11_400, on: HOY - i) }
+
+  a = ProductPrices.new(period: "3", to: HOY)
+  c = a.con_ventas.first.canales.first
+
+  assert c.sin_costo?
+  assert_nil c.costo,        "sin dato es nil, nunca 0: un costo de 0 diría 100% de margen"
+  assert_nil c.margen_pct
+  assert_nil c.margen_pesos
+  assert_equal ["Margherita 32 cm"], a.sin_costo.map(&:name)
+  assert_empty a.con_costo
+  assert_nil a.margen_pct, "sin ningún costo no hay margen de menú que inventar"
+end
+
+test "un costo de 0 en Fudo cuenta como sin costo" do
+  producto(1, "Rara PLATO", 5_000).update!(cost: 0)
+  6.times { |i| vender(1, "Rara PLATO", 5_000, on: HOY - i) }
+
+  assert ProductPrices.new(period: "3", to: HOY).con_ventas.first.canales.first.sin_costo?
+end
+
+test "la cobertura mide qué parte de la facturación tiene costo, no cuántos platos" do
+  # Un plato con costo que casi no vende no puede decir que el menú está cubierto.
+  producto(1, "Pizza PLATO", 10_000)                    # sin costo, factura mucho
+  90.times { |i| vender(1, "Pizza PLATO", 10_000, on: HOY - (i % 20)) }
+  producto(2, "Agua PLATO", 2_000).update!(cost: 400)   # con costo, factura poco
+  5.times { |i| vender(2, "Agua PLATO", 2_000, on: HOY - i) }
+
+  a = ProductPrices.new(period: "3", to: HOY)
+
+  assert_equal 1, a.sin_costo.size
+  assert_equal 1, a.con_costo.size
+  assert_in_delta 1.1, a.cobertura_costos_pct, 0.2, "10.000 de 910.000 facturados"
+end
+
+test "un costo por encima del precio se señala y no se corrige" do
+  # El Pisco Norterra está cargado en Fudo a $99.999 y se vende a $6.200.
+  producto(1, "Pisco Norterra 40º", 6_200).update!(cost: 99_999)
+  6.times { |i| vender(1, "Pisco Norterra 40º", 6_200, on: HOY - i) }
+
+  a = ProductPrices.new(period: "3", to: HOY)
+  c = a.con_ventas.first.canales.first
+
+  assert c.margen_negativo?
+  assert_equal 99_999, c.costo, "el dato se deja como está para que salte a la vista"
+  assert_operator c.margen_pct, :<, 0
+  assert_equal ["Pisco Norterra 40º"], a.costos_sospechosos.map(&:name)
+end
+
+test "el margen del plato pondera sus canales y el del menú lo que factura cada plato" do
+  # Mismo plato, dos canales con el mismo costo: el que cobra más deja más margen, y
+  # el margen del plato tiene que caer entre los dos, no ser el promedio simple.
+  producto(1, "Margherita 32 cm PLATO", 11_400).update!(cost: 4_000)
+  producto(2, "Margherita 32 cm APLICACION", 14_250).update!(cost: 4_000)
+  20.times { |i| vender(1, "Margherita 32 cm PLATO", 11_400, on: HOY - (i % 10)) }
+  2.times  { |i| vender(2, "Margherita 32 cm APLICACION", 14_250, on: HOY - i) }
+
+  g = ProductPrices.new(period: "3", to: HOY).con_ventas.first
+  plato = g.canales.find { |c| c.label == "PLATO" }
+  app   = g.canales.find { |c| c.label == "APLICACION" }
+
+  assert_operator app.margen_pct, :>, plato.margen_pct
+  assert_operator g.margen_pct, :>, plato.margen_pct
+  assert_operator g.margen_pct, :<, app.margen_pct
+  assert_in_delta plato.margen_pct, g.margen_pct, 1.5,
+                  "20 unidades contra 2: manda el canal PLATO"
+end
+
+test "un canal con costo basta para que el plato no cuente como sin costo" do
+  producto(1, "Margherita 32 cm PLATO", 11_400).update!(cost: 4_000)
+  producto(2, "Margherita 32 cm APLICACION", 14_250) # sin costo
+  6.times { |i| vender(1, "Margherita 32 cm PLATO", 11_400, on: HOY - i) }
+  6.times { |i| vender(2, "Margherita 32 cm APLICACION", 14_250, on: HOY - i) }
+
+  g = ProductPrices.new(period: "3", to: HOY).con_ventas.first
+
+  assert_not g.sin_costo?, "el costo de hacer la pizza ya se conoce"
+  assert_equal ["PLATO"], g.con_costo.map(&:label)
+  assert_not_nil g.margen_pct
+end
 end
