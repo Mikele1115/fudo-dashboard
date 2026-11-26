@@ -116,7 +116,7 @@
                 <span class="tag tag--error" title="El costo cargado en Fudo es mayor que lo que se cobra: hay que revisarlo">revisar costo</span>
               <% end %>
               <% if a.receta_disparada?(g) %>
-                <span class="tag tag--error" title="Su receta cuesta mucho más por un canal que por otro, bastante más de lo que explica la comisión de la app">revisar receta</span>
+                <span class="tag tag--receta" title="Su receta cuesta mucho más por un canal que por otro, bastante más de lo que explica la comisión de la app">revisar receta</span>
               <% end %></td>
           <td class="muted small"><%= g.vendidos.map(&:label).join(" · ") %></td>
           <td><strong><%= money(principal.cobrado) %></strong>
