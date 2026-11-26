@@ -26,9 +26,9 @@
             <td class="muted"><%= money(c.carta) %></td>
             <td><strong><%= money(c.cobrado) %></strong></td>
             <td><%= c.desvio_pct && c.desvio_pct.abs >= 1 ? content_tag(:span, format("%+.0f%%", c.desvio_pct), class: "pct pct--down") : content_tag(:span, "—", class: "pct pct--na") %></td>
-<td><%= costo_celda(c) %></td>
-<td><%= margen_celda(c) %></td>
-<td class="muted"><%= money(c.antes) %></td>
+            <td><%= costo_celda(c) %></td>
+            <td><%= margen_celda(c) %></td>
+            <td class="muted"><%= money(c.antes) %></td>
             <td><%= money(c.ahora) %></td>
             <td><%= c.comparable? ? pct_badge(100 + c.change_pct, 100) : content_tag(:span, "—", class: "pct pct--na") %></td>
             <td><%= int(c.unidades) %></td>

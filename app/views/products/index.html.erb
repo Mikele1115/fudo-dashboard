@@ -111,14 +111,17 @@
               <%= fudo_edit_link(:product, principal.product.fudo_product_id) %>
               <% if g.vendidos.any? { |c| !c.product.active } %>
                 <span class="tag tag--warn" title="Marcado como inactivo en Fudo, pero sigue vendiendo">inactivo en Fudo</span>
+              <% end %>
+              <% if g.margen_negativo? %>
+                <span class="tag tag--warn" title="El costo cargado en Fudo es mayor que lo que se cobra: hay que revisarlo">revisar costo</span>
               <% end %></td>
           <td class="muted small"><%= g.vendidos.map(&:label).join(" · ") %></td>
           <td><strong><%= money(principal.cobrado) %></strong>
               <%= content_tag(:span, "≠ carta", class: "tag tag--warn",
                               title: "Carta #{money(principal.carta)}") unless g.cuadra? %></td>
-<td><%= costo_celda(principal) %></td>
-<td><%= margen_celda(principal) %></td>
-<td class="muted"><%= money(principal.antes) %></td>
+          <td><%= costo_celda(principal) %></td>
+          <td><%= margen_celda(principal) %></td>
+          <td class="muted"><%= money(principal.antes) %></td>
           <td><%= g.change_pct ? pct_badge(100 + g.change_pct, 100) : content_tag(:span, "—", class: "pct pct--na") %></td>
           <td><%= int(g.unidades) %></td>
           <td><%= money(g.ingreso) %></td>
@@ -199,7 +202,7 @@
   <%= render layout: "shared/kpi", locals: {
         icon: :alert, tono: "slate", label: "Sin costo en Fudo",
         value: int(a.sin_costo.size),
-        delta: a.cobertura_costos_pct ? "solo el #{pct_plano(a.cobertura_costos_pct)} de lo facturado tiene costo" : nil,
+        delta: costos_delta(a),
         hint: "Fudo guarda un costo por producto, pero solo si alguien lo cargó o si el plato tiene su receta. Sin ese dato no hay margen que calcular, y es el único que falta: los precios de venta y los de los insumos ya se siguen solos." } do %>
     <% if a.sin_costo.empty? %>
       <p class="muted">Todos los platos tienen costo cargado.</p>
@@ -226,7 +229,7 @@
     <% end %>
 
     <% if a.costos_sospechosos.any? %>
-      <h3 class="kpi__subtitle txt--bad">Costo por encima del precio (<%= int(a.costos_sospechosos.size) %>)</h3>
+      <h3 class="kpi__subtitle txt--bad">Costos por revisar (<%= int(a.costos_sospechosos.size) %>)</h3>
       <p class="muted small">
         El costo cargado es mayor que lo que se cobra sin IVA. El dato se deja como está
         para que salte a la vista; se corrige en Fudo.

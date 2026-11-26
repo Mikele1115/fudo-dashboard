@@ -48,33 +48,51 @@ module FormatHelper
     %(<span class="pct #{klass}">#{pct_text(current, base)}</span>).html_safe
   end
 
-# Un porcentaje que ya ES un porcentaje, sin comparar nada: "79%", "-1.513%".
-def pct_plano(v, decimales: 0)
-  return "—" if v.nil?
+  # Un porcentaje que ya ES un porcentaje, sin comparar nada: "79%", "-1.513%".
+  def pct_plano(v, decimales: 0)
+    return "—" if v.nil?
 
-  format("%.#{decimales}f%%", v).tr(".", ",")
-end
+    format("%.#{decimales}f%%", v).tr(".", ",")
+  end
 
-# El costo de un canal, o el aviso de que Fudo no tiene ninguno cargado. Sin costo no
-# se pone 0: un 0 diría 100% de margen, que es justo la conclusión equivocada.
-def costo_celda(canal)
-  return tag.span("sin costo", class: "tag tag--na",
-                  title: "Fudo no tiene costo cargado para este producto. Se carga en el producto o en su receta.") if canal.sin_costo?
+  # El costo de un canal, o el aviso de que Fudo no tiene ninguno cargado. Sin costo no
+  # se pone 0: un 0 diría 100% de margen, que es justo la conclusión equivocada.
+  def costo_celda(canal)
+    return tag.span("sin costo", class: "tag tag--na",
+                    title: "Fudo no tiene costo cargado para este producto. Se carga en el producto o en su receta.") if canal.sin_costo?
 
-  safe_join([money(canal.costo), tag.span("sin IVA", class: "muted small")], " ")
-end
+    # Un costo por encima de lo que se cobra no se corrige: se marca. El dato torcido
+    # tiene que verse en Fudo, que es donde se arregla.
+    if canal.margen_negativo?
+      return safe_join([money(canal.costo),
+                        tag.span("revisar", class: "tag tag--warn",
+                                 title: "El costo cargado (#{money(canal.costo)}) es mayor que lo que se cobra sin IVA (#{money(canal.precio_neto)}). Hay que revisarlo en Fudo.")], " ")
+    end
 
-# El margen sobre el precio sin IVA. Rojo cuando sale negativo: ahí el costo está mal
-# cargado casi siempre, y el dato se deja como está para que se vea.
-def margen_celda(canal)
-  return tag.span("—", class: "pct pct--na") if canal.margen_pct.nil?
+    safe_join([money(canal.costo), tag.span("sin IVA", class: "muted small")], " ")
+  end
 
-  klass = canal.margen_negativo? ? "pct pct--down" : "pct pct--up"
-  titulo = "#{money(canal.precio_neto)} sin IVA − #{money(canal.costo)} de costo = #{money(canal.margen_pesos)}"
-  tag.span(pct_plano(canal.margen_pct), class: klass, title: titulo)
-end
+  # El margen sobre el precio sin IVA. Rojo cuando sale negativo: ahí el costo está mal
+  # cargado casi siempre, y el dato se deja como está para que se vea.
+  def margen_celda(canal)
+    return tag.span("—", class: "pct pct--na") if canal.margen_pct.nil?
 
-# Para el correo (los clientes de correo no cargan CSS externo): estilos en línea.
+    klass = canal.margen_negativo? ? "pct pct--down" : "pct pct--up"
+    titulo = "#{money(canal.precio_neto)} sin IVA − #{money(canal.costo)} de costo = #{money(canal.margen_pesos)}"
+    tag.span(pct_plano(canal.margen_pct), class: klass, title: titulo)
+  end
+
+  # Qué parte de la facturación tiene costo. Mientras falte casi todo la frase lleva
+  # "solo"; cuando ya no falta nada, decir "solo el 100%" sonaría a reproche.
+  def costos_delta(analisis)
+    cobertura = analisis.cobertura_costos_pct
+    return nil if cobertura.nil?
+    return "todo lo que se vende tiene costo cargado" if cobertura >= 99.5
+
+    "solo el #{pct_plano(cobertura)} de lo facturado tiene costo"
+  end
+
+  # Para el correo (los clientes de correo no cargan CSS externo): estilos en línea.
   def pct_inline(current, base)
     v = pct_value(current, base)
     return %(<span style="color:#9ca3af;">—</span>).html_safe if v.nil?
