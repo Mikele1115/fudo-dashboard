@@ -1,0 +1,11 @@
+<%# Cambia el período de medición de una ficha (insumo o producto) sin salir de ella.
+    Locales: periodos (hash clave => etiqueta), actual (clave elegida). %>
+<div class="datepicker">
+  <form method="get" action="<%= request.path %>" class="inline">
+    <select name="period" aria-label="Período de medición" onchange="this.form.requestSubmit()">
+      <% periodos.each do |key, label| %>
+        <option value="<%= key %>" <%= "selected" if key == actual %>><%= label %></option>
+      <% end %>
+    </select>
+  </form>
+</div>

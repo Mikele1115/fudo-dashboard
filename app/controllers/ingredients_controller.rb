@@ -33,9 +33,17 @@ class IngredientsController < ApplicationController
   end
 
   def show
+    id      = params[:id].to_i
     @prices = IngredientPrices.new(period: params[:period])
-    @alerts = PriceAlert.where(fudo_ingredient_id: params[:id].to_i).recent.limit(5)
-    @row    = @prices.rows.find { |r| r.ingredient_id == params[:id].to_i }
+    @alerts = PriceAlert.where(fudo_ingredient_id: id).recent.limit(5)
+    @row    = @prices.rows.find { |r| r.ingredient_id == id }
+    # Con el selector de período se puede elegir uno en el que el insumo no se compró:
+    # en vez de echarte al listado, se muestra todo su historial y se avisa.
+    if @row.nil? && @prices.period_key != "all"
+      @prices = IngredientPrices.new(period: "all")
+      @row    = @prices.rows.find { |r| r.ingredient_id == id }
+      flash.now[:alert] = "Ese insumo no tiene compras en el período elegido; se muestra todo su historial." if @row
+    end
     @clave  = KeyIngredient.find_by(fudo_ingredient_id: params[:id].to_i)
     return redirect_to ingredients_path, alert: "Ese insumo no tiene compras en el período elegido." if @row.nil?
 

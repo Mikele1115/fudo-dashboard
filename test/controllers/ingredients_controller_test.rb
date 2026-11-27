@@ -319,4 +319,25 @@ class IngredientsControllerTest < ActionDispatch::IntegrationTest
     get ingredient_path(5, period: "all")
     assert_select "button", text: "Quitar de claves"
   end
+
+  test "la ficha del insumo deja cambiar el período y recuerda el elegido" do
+    buy(name: "Mozzarella", qty: 10, total: 70_000, ingredient_id: 5)
+
+    get ingredient_path(5, period: "6")
+
+    assert_response :success
+    assert_select "select[name=period] option[selected]", text: "6 meses"
+    assert_select "a[href*='period=6']", text: /Volver a insumos/
+  end
+
+  test "si el insumo no se compró en el período elegido, se muestra todo el historial" do
+    buy(name: "Harina", qty: 10, total: 50_000, ingredient_id: 6)
+    buy(name: "Mozzarella", qty: 10, total: 70_000, ingredient_id: 5, on: HOY - 800)
+
+    get ingredient_path(5, period: "1")
+
+    assert_response :success
+    assert_select ".flash--error", text: /no tiene compras en el período elegido/
+    assert_select "select[name=period] option[selected]", text: "Todo"
+  end
 end

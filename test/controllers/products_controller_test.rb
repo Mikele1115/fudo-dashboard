@@ -86,6 +86,17 @@ class ProductsControllerTest < ActionDispatch::IntegrationTest
     assert_select ".pct.pct--up", text: "79%"
   end
 
+  test "el detalle deja cambiar el período y recuerda el elegido" do
+    producto(1, "Coca cola Original", 2_900, costo: 519)
+    vender(1, "Coca cola Original", 2_900)
+
+    get product_path(1, period: "12")
+
+    assert_select "select[name=period] option[selected]", text: "12 meses"
+    assert_select "select[name=period] option", count: ProductPrices::PERIODS.size
+    assert_select "a[href*='period=12']", text: /Volver a productos/
+  end
+
   test "el detalle avisa cuando el canal que miras no tiene costo" do
     producto(1, "Margherita 32 cm PLATO", 11_400, costo: 4_000)
     producto(2, "Margherita 32 cm APLICACION", 14_250)

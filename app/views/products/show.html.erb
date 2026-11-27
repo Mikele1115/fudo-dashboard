@@ -6,7 +6,10 @@
       <%= (@grupo&.vendidos || []).map { |c| "#{c.label} #{money(c.cobrado)}" }.join(" · ").presence || @product.name %>
     </p>
   </div>
-  <%= link_to "‹ Volver a productos", products_path(period: a.period_key), class: "btn btn--ghost" %>
+  <div class="datepicker">
+    <%= render "shared/selector_periodo", periodos: ProductPrices::PERIODS, actual: a.period_key %>
+    <%= link_to "‹ Volver a productos", products_path(period: a.period_key), class: "btn btn--ghost" %>
+  </div>
 </section>
 
 <% if @grupo %>

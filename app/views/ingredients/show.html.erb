@@ -9,7 +9,10 @@
       <% if r.providers.any? %>Proveedor<%= "es" if r.providers.size > 1 %>: <%= r.providers.join(", ") %>.<% end %>
     </p>
   </div>
-  <%= link_to "‹ Volver a insumos", ingredients_path(period: @prices.period_key), class: "btn btn--ghost" %>
+  <div class="datepicker">
+    <%= render "shared/selector_periodo", periodos: IngredientPrices::PERIODS, actual: @prices.period_key %>
+    <%= link_to "‹ Volver a insumos", ingredients_path(period: @prices.period_key), class: "btn btn--ghost" %>
+  </div>
 </section>
 
 <section class="kpis kpis--6">
