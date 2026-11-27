@@ -282,4 +282,41 @@ class IngredientsControllerTest < ActionDispatch::IntegrationTest
     tabla = css_select("section.card--alert table").to_html
     assert_no_match(/revisar carga/, tabla)
   end
+
+  test "marca un insumo como clave, cambia su umbral y lo quita" do
+    buy(name: "Mozzarella", qty: 10, total: 70_000, ingredient_id: 5)
+
+    post key_ingredient_path(5)
+    assert_redirected_to ingredient_path(5)
+    assert_equal 5.0, KeyIngredient.find_by!(fudo_ingredient_id: 5).threshold
+
+    patch key_ingredient_path(5), params: { change_pct: "7,5" }
+    assert_equal 7.5, KeyIngredient.find_by!(fudo_ingredient_id: 5).threshold
+
+    patch key_ingredient_path(5), params: { change_pct: "-3" }
+    assert_equal 7.5, KeyIngredient.find_by!(fudo_ingredient_id: 5).threshold, "un umbral negativo no se guarda"
+
+    delete key_ingredient_path(5)
+    assert_not KeyIngredient.exists?(fudo_ingredient_id: 5)
+  end
+
+  test "un insumo sin compras no se puede marcar" do
+    post key_ingredient_path(404)
+
+    assert_redirected_to ingredients_path
+    assert_equal 0, KeyIngredient.count
+  end
+
+  test "el panel lista los insumos clave con su umbral" do
+    buy(name: "Mozzarella", qty: 10, total: 70_000, ingredient_id: 5)
+    KeyIngredient.create!(fudo_ingredient_id: 5, ingredient_name: "Mozzarella", change_pct: 6)
+
+    get ingredients_path(period: "all")
+
+    assert_response :success
+    assert_select "h2", text: "Insumos clave"
+    assert_select "td", text: "6,0%"
+    get ingredient_path(5, period: "all")
+    assert_select "button", text: "Quitar de claves"
+  end
 end

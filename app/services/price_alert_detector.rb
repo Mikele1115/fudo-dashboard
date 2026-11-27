@@ -34,6 +34,9 @@ class PriceAlertDetector
   BASELINE_MIN  = 3       # compras previas mínimas para tener una referencia fiable
   COOLDOWN_DAYS = 14      # no repetir aviso del mismo insumo dentro de este plazo
 
+  # Los insumos clave (KeyIngredient) avisan con su propio umbral de % y sin los filtros de
+  # dinero: son los que la pizzería marcó a mano porque una subida chica ya importa.
+
   def self.run!(since: nil) = new.run!(since: since)
 
   def initialize(logger: Rails.logger)
@@ -45,6 +48,7 @@ class PriceAlertDetector
   def run!(since: nil)
     since ||= AppSettings.today - 7
     nuevas = []
+    @claves = KeyIngredient.by_ingredient
 
     IngredientPurchase.where(purchased_on: since..).chronological.each do |purchase|
       next if PriceAlert.exists?(fudo_item_id: purchase.fudo_item_id)
@@ -81,12 +85,15 @@ class PriceAlertDetector
     baseline = IngredientPrices.median(clean)
     return nil if baseline.nil? || baseline.zero?
 
+    clave  = (@claves ||= KeyIngredient.by_ingredient)[purchase.fudo_ingredient_id]
     change = (new_price - baseline) / baseline * 100.0
-    return nil if change < CHANGE_PCT
+    return nil if change < (clave ? clave.threshold : CHANGE_PCT)
 
     overcost = (new_price - baseline) * purchase.quantity.to_f
-    return nil if overcost < MIN_OVERCOST
-    return nil if annual_spend(purchase) < MIN_SPEND
+    unless clave
+      return nil if overcost < MIN_OVERCOST
+      return nil if annual_spend(purchase) < MIN_SPEND
+    end
     return nil if recently_alerted?(purchase)
 
     # Un precio unitario disparado también sale de cargar menos cantidad de la que se
@@ -107,6 +114,7 @@ class PriceAlertDetector
       change_pct:         change,
       overcost:           overcost,
       quantity:           purchase.quantity,
+      key_ingredient:     clave.present?,
       suspect_quantity:   twin.present?,
       twin_quantity:      twin&.quantity,
       twin_purchased_on:  twin&.purchased_on

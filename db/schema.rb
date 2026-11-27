@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_11_26_035143) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_26_120000) do
   create_table "daily_sales", force: :cascade do |t|
     t.datetime "created_at", null: false
     t.date "date", null: false
@@ -78,6 +78,16 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_26_035143) do
     t.index ["fudo_id"], name: "index_ingredients_on_fudo_id", unique: true
   end
 
+  create_table "key_ingredients", force: :cascade do |t|
+    t.decimal "change_pct", precision: 5, scale: 2
+    t.datetime "created_at", null: false
+    t.integer "fudo_ingredient_id", null: false
+    t.string "ingredient_name", null: false
+    t.datetime "updated_at", null: false
+    t.index ["fudo_ingredient_id"], name: "index_key_ingredients_on_fudo_ingredient_id", unique: true
+    t.check_constraint "change_pct IS NULL OR change_pct > 0", name: "key_ingredients_pct_positivo"
+  end
+
   create_table "price_alerts", force: :cascade do |t|
     t.datetime "acknowledged_at"
     t.decimal "baseline_price", precision: 14, scale: 4, null: false
@@ -86,6 +96,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_11_26_035143) do
     t.integer "fudo_ingredient_id", null: false
     t.integer "fudo_item_id", null: false
     t.string "ingredient_name", null: false
+    t.boolean "key_ingredient", default: false, null: false
     t.decimal "new_price", precision: 14, scale: 4, null: false
     t.datetime "notified_at"
     t.decimal "overcost", precision: 14, scale: 2, null: false

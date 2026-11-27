@@ -74,6 +74,12 @@ module IngredientsHelper
 
   # Etiqueta para la alerta cuya cantidad no cuadra con la plata. No afirma cuál es la
   # cantidad correcta: dice qué monto se pagó antes y por cuánto, y que hay que mirarlo.
+  def alert_key_tag(alert)
+    return "" unless alert.key_ingredient?
+
+    tag.span("clave", class: "tag tag--warn", title: "Insumo clave: avisa con un umbral más sensible")
+  end
+
   def alert_suspect_tag(alert)
     return "" unless alert.suspect?
 

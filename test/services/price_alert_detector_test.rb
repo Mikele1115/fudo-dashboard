@@ -148,4 +148,39 @@ class PriceAlertDetectorTest < ActiveSupport::TestCase
     assert_equal 1, alertas.count(&:suspect?)
     assert_equal "Un insumo subió de precio y una carga para revisar", PriceAlert.headline(alertas)
   end
+
+  test "un insumo clave avisa con su propio umbral, aunque la subida sea chica" do
+    historial_estable
+    buy(on: TODAY - 1, qty: 20, unit_total: 20 * 7_500) # +7,1%: bajo el 15% general
+    KeyIngredient.create!(fudo_ingredient_id: 1, ingredient_name: "Mozzarella", change_pct: 6)
+
+    alertas = PriceAlertDetector.run!(since: TODAY - 5)
+
+    assert_equal 1, alertas.size
+    assert alertas.first.key_ingredient?
+  end
+
+  test "un insumo clave se salta los filtros de dinero" do
+    historial_estable
+    buy(on: TODAY - 1, qty: 0.1, unit_total: 0.1 * 14_000) # +100% pero solo $700 de más
+    KeyIngredient.create!(fudo_ingredient_id: 1, ingredient_name: "Mozzarella")
+
+    assert_equal 1, PriceAlertDetector.run!(since: TODAY - 5).size
+  end
+
+  test "un insumo clave no avisa por debajo de su umbral" do
+    historial_estable
+    buy(on: TODAY - 1, qty: 20, unit_total: 20 * 7_200) # +2,9%
+    KeyIngredient.create!(fudo_ingredient_id: 1, ingredient_name: "Mozzarella") # 5% por defecto
+
+    assert_empty PriceAlertDetector.run!(since: TODAY - 5)
+  end
+
+  test "un insumo que no es clave sigue con el umbral general" do
+    historial_estable
+    buy(on: TODAY - 1, qty: 20, unit_total: 20 * 7_500)
+    KeyIngredient.create!(fudo_ingredient_id: 99, ingredient_name: "Otro")
+
+    assert_empty PriceAlertDetector.run!(since: TODAY - 5)
+  end
 end

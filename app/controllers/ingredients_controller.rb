@@ -19,6 +19,8 @@ class IngredientsController < ApplicationController
     @show_all = params[:all].present?
     @rows     = @prices.sorted(@sort)
     @typos  = typos.size
+    @claves = KeyIngredient.ordered.to_a
+    @filas_por_id = @prices.rows.index_by(&:ingredient_id)
   end
 
   # Lineas donde el monto cuadra y la cantidad no: errores de carga a corregir
@@ -34,6 +36,7 @@ class IngredientsController < ApplicationController
     @prices = IngredientPrices.new(period: params[:period])
     @alerts = PriceAlert.where(fudo_ingredient_id: params[:id].to_i).recent.limit(5)
     @row    = @prices.rows.find { |r| r.ingredient_id == params[:id].to_i }
+    @clave  = KeyIngredient.find_by(fudo_ingredient_id: params[:id].to_i)
     return redirect_to ingredients_path, alert: "Ese insumo no tiene compras en el período elegido." if @row.nil?
 
     # Historial completo del insumo, al margen del período elegido arriba.
