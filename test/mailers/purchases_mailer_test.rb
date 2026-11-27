@@ -18,16 +18,35 @@ class PurchasesMailerTest < ActionMailer::TestCase
     ENV.delete("PRICE_ALERTS_EXTRA_TO")
   end
 
-  def alert(suspect: false, name: "Mozzarella")
+  def alert(suspect: false, name: "Mozzarella", clave: false)
     @seq = (@seq || 0) + 1
     PriceAlert.create!(
       fudo_item_id: @seq, fudo_ingredient_id: @seq, ingredient_name: name, unit_name: "kg",
       provider_name: "Lacteos SA", purchased_on: Date.new(2026, 11, 11),
       baseline_price: 7_000, new_price: 17_500, change_pct: 150.0,
       overcost: 126_000, quantity: 12,
-      suspect_quantity: suspect,
+      suspect_quantity: suspect, key_ingredient: clave,
       twin_quantity: (30 if suspect), twin_purchased_on: (Date.new(2026, 10, 28) if suspect)
     )
+  end
+
+  test "una compra de un insumo clave lleva la etiqueta en el correo" do
+    normal = alert(name: "Albahaca")
+    clave  = alert(name: "Mozzarella", clave: true)
+
+    correo = PurchasesMailer.price_alerts([normal.id, clave.id])
+
+    html, texto = correo.html_part.body.to_s, correo.text_part.body.to_s
+    assert_equal 1, html.scan("insumo clave</span>").size
+    assert_match(/Mozzarella.*\[INSUMO CLAVE\]/, texto)
+    assert_no_match(/Albahaca.*\[INSUMO CLAVE\]/, texto)
+    assert_match "propio umbral", html
+  end
+
+  test "sin insumos clave el correo no los menciona" do
+    correo = PurchasesMailer.price_alerts([alert.id])
+
+    assert_no_match(/clave/i, correo.html_part.body.to_s + correo.text_part.body.to_s)
   end
 
   test "una subida real sale como alerta de precios con su sobrecosto" do

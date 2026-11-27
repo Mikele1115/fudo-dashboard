@@ -10,7 +10,7 @@ Revisar en <%= review_ingredients_url %>
 <% end -%>
 <% @alerts.each do |a| -%>
 
-<%= a.ingredient_name %> (<%= a.purchased_on.strftime("%d/%m/%Y") %><% if a.provider_name.present? %>, <%= a.provider_name %><% end %>)<%= a.suspect? ? "  [REVISAR CARGA]" : "" %>
+<%= a.ingredient_name %> (<%= a.purchased_on.strftime("%d/%m/%Y") %><% if a.provider_name.present? %>, <%= a.provider_name %><% end %>)<%= a.key_ingredient? ? "  [INSUMO CLAVE]" : "" %><%= a.suspect? ? "  [REVISAR CARGA]" : "" %>
   Se venía pagando: <%= money(a.baseline_price) %> / <%= a.unit_label %>
   Esta compra:      <%= money(a.new_price) %> / <%= a.unit_label %> (<%= pct_text(a.new_price.to_f, a.baseline_price.to_f) %>)
   Cantidad:         <%= number_with_precision(a.quantity, precision: 2) %> <%= a.unit_label %>
@@ -30,3 +30,6 @@ Revisar en <%= review_ingredients_url %>
 Se avisa cuando el precio sube más de <%= PriceAlertDetector::CHANGE_PCT.round %>% sobre la mediana del último año,
 la compra cuesta de más al menos <%= money(PriceAlertDetector::MIN_OVERCOST) %> y el insumo mueve
 <%= money(PriceAlertDetector::MIN_SPEND) %> al año. Precios netos, sin IVA.
+<% if @alerts.any?(&:key_ingredient?) -%>
+Los insumos clave avisan con su propio umbral, sin esos mínimos de dinero.
+<% end -%>

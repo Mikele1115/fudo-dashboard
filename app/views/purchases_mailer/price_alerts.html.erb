@@ -36,6 +36,9 @@
     <% @alerts.each do |a| %>
       <div style="border:1px solid #e5e7eb;border-left:4px solid <%= a.suspect? ? "#d97706" : "#b91c1c" %>;border-radius:6px;padding:14px 16px;margin-bottom:12px;">
         <div style="font-size:16px;font-weight:600;"><%= a.ingredient_name %>
+          <% if a.key_ingredient? %>
+            <span style="font-size:11px;font-weight:600;color:#1e40af;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:2px 8px;vertical-align:middle;">insumo clave</span>
+          <% end %>
           <% if a.suspect? %>
             <span style="font-size:11px;font-weight:600;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:2px 8px;vertical-align:middle;">revisar carga</span>
           <% end %>
@@ -97,6 +100,9 @@
     mediana del último año, la compra cuesta de más al menos
     <%= money(PriceAlertDetector::MIN_OVERCOST) %> y el insumo mueve
     <%= money(PriceAlertDetector::MIN_SPEND) %> al año. Precios netos, sin IVA.
+    <% if @alerts.any?(&:key_ingredient?) %>
+      <br>Los insumos clave avisan con su propio umbral, sin esos mínimos de dinero.
+    <% end %>
   </td></tr>
 
 </table>
