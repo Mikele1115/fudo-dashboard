@@ -21,10 +21,10 @@ class ProductPricesTest < ActiveSupport::TestCase
   end
 
   # La Margherita: mismo plato, tres productos en Fudo, tres precios.
-  def cargar_margherita
+  def cargar_margherita(aplicacion_activa: true)
     producto(1, "Margherita 32 cm PLATO", 11_400)
     producto(2, "Margherita 32 cm DELIVERY", 11_400)
-    producto(3, "Margherita 32 cm APLICACION", 11_600, activo: false) # inactiva pero vende
+    producto(3, "Margherita 32 cm APLICACION", 11_600, activo: aplicacion_activa)
     5.times { |i| vender(1, "Margherita 32 cm PLATO", 11_400, on: HOY - (i * 10), veces: 2) }
     5.times { |i| vender(2, "Margherita 32 cm DELIVERY", 11_400, on: HOY - (i * 10)) }
     5.times { |i| vender(3, "Margherita 32 cm APLICACION", 14_250, on: HOY - (i * 10), veces: 3) }
@@ -55,25 +55,26 @@ class ProductPricesTest < ActiveSupport::TestCase
     assert_includes con.con_ventas.map(&:name), "Descatalogado"
   end
 
-  test "un inactivo que SÍ vende se queda, pase lo que pase" do
-    producto(1, "Margherita 32 cm APLICACION", 11_600, activo: false)
-    8.times { |i| vender(1, "Margherita 32 cm APLICACION", 14_250, on: HOY - i) }
+  test "un inactivo que SÍ vende se queda, salvo en el canal APLICACION" do
+    producto(1, "Vigente PLATO", 10_000)
+    producto(2, "Viejo DELIVERY", 9_000, activo: false)
+    producto(3, "Viejo APLICACION", 9_500, activo: false)
+    [[1, "Vigente PLATO"], [2, "Viejo DELIVERY"], [3, "Viejo APLICACION"]].each do |id, nombre|
+      8.times { |i| vender(id, nombre, 9_000, on: HOY - i) }
+    end
 
-    a = ProductPrices.new(period: "12", to: HOY)
+    canales = ProductPrices.new(period: "12", to: HOY).con_ventas.flat_map(&:canales).map { |c| c.product.name }
 
-    assert_equal ["Margherita 32 cm"], a.con_ventas.map(&:name),
-                 "es el más vendido: sacarlo por estar inactivo en Fudo sería el peor error"
-    assert_empty a.descatalogados
+    assert_includes canales, "Viejo DELIVERY"
+    assert_not_includes canales, "Viejo APLICACION"
   end
 
-  test "un producto inactivo que sigue vendiendo no desaparece del informe" do
-    cargar_margherita
+  test "la pizza inactiva de APLICACION sale aunque venda, y las otras del plato se quedan" do
+    cargar_margherita(aplicacion_activa: false)
 
     g = ProductPrices.new(period: "3", to: HOY).con_ventas.find { |x| x.name == "Margherita 32 cm" }
-    app = g.canales.find { |c| c.label == "APLICACION" }
 
-    assert_not_nil app, "era el más vendido y el filtro por «activo» lo tiraba"
-    assert_equal 15, app.unidades
+    assert_equal %w[DELIVERY PLATO], g.canales.map(&:label).sort
   end
 
   test "distingue el precio de carta del que de verdad se cobra" do

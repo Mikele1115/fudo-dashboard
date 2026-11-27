@@ -291,22 +291,22 @@ class ProductPrices
     @to.prev_month(@period_key.to_i) + 1
   end
 
-  # Qué productos entran: los activos con precio MÁS los inactivos que SIGUEN VENDIENDO.
+  # Qué productos entran: los activos con precio MÁS los inactivos que SIGUEN VENDIENDO,
+  # salvo los inactivos del canal APLICACION.
   #
-  # El `active` de Fudo no dice lo que parece. De 356 canales con ventas en 12 meses, 92
-  # son de productos marcados como inactivos, y 19 de ellos siguen vendiendo: entre esos
-  # está el más vendido de todos, la Margherita 32 APLICACION, con 531 unidades en los
-  # últimos 30 días y $17M al año. Filtrar por `active` a secas borraría del informe el
-  # producto que más factura.
-  #
-  # Los otros 73 son catálogo muerto —"Margherita Pedidos Ya", "Coda APA 500cc"— que solo
-  # estorba. Esos sí quedan fuera, y el panel dice cuántos son y deja verlos a un clic.
+  # El `active` de Fudo no dice lo que parece: hay inactivos que siguen vendiendo. Pero
+  # las pizzas de APLICACION marcadas como inactivas se sacan del informe aunque vendan
+  # (decisión del dueño: en Fudo están dadas de baja, la Margherita 32 APLICACION incluida).
+  # Los inactivos de otros canales que venden se mantienen.
   def universo(ids_con_venta)
     vivos = Product.activos.con_precio
-    return Product.where(id: vivos).or(Product.where(fudo_product_id: ids_con_venta)).to_a if @descatalogados
+    ids   = @descatalogados ? ids_con_venta : ventas_recientes.keys
+    Product.where(id: vivos).or(Product.where(fudo_product_id: ids)).to_a
+           .reject { |producto| dado_de_baja_en_aplicacion?(producto) }
+  end
 
-    Product.where(id: vivos)
-           .or(Product.where(fudo_product_id: ventas_recientes.keys)).to_a
+  def dado_de_baja_en_aplicacion?(producto)
+    !producto.active && producto.channel == "APLICACION"
   end
 
   public
